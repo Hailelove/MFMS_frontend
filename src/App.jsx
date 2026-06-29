@@ -35,10 +35,12 @@ import AdminDashboard from "./pages/Admin/Dashboard";
 import ManageUsers from "./pages/Admin/ManageUsers";
 import ManageLoans from "./pages/Admin/ManageLoans";
 import ManageSavings from "./pages/Admin/ManageSavings";
-import ManageAttendance from "./pages/Admin/ManageAttendance";
+// import ManageAttendance from "./pages/Admin/ManageAttendance";
 import ManageReports from "./pages/Admin/ManageReports";
 import RegisterMember from "./pages/Admin/RegisterMember";
 import CampusRegistration from "./pages/Admin/CampusRegistration";
+import PayrollManager from "./pages/Admin/PayrollManager";
+import LedgerView from "./pages/Admin/LedgerView";
 
 const App = () => {
   return (
@@ -85,9 +87,11 @@ const App = () => {
               <Route path="users" element={<ManageUsers />} />
               <Route path="loans" element={<ManageLoans />} />
               <Route path="savings" element={<ManageSavings />} />
-              <Route path="attendance" element={<ManageAttendance />} />
+              {/* <Route path="attendance" element={<ManageAttendance />} /> */}
               <Route path="reports" element={<ManageReports />} />
               <Route path="campuses" element={<CampusRegistration />} />
+              <Route path="payroll" element={<PayrollManager />} />
+              <Route path="ledger" element={<LedgerView />} />
             </Route>
           </Route>
 

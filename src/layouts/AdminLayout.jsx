@@ -4,13 +4,15 @@ import { AuthContext } from "../context/AuthContext";
 import Swal from "sweetalert2";
 
 const NAV_ITEMS = [
-  { to: "/admin/dashboard", icon: "⬡", label: "Dashboard" },
+  { to: "/admin/dashboard", icon: "📈", label: "Dashboard" },
   { to: "/admin/campuses", icon: "🏢", label: "Campus Register" },
   { to: "/admin/register", icon: "👤", label: "Register Member" },
   { to: "/admin/users", icon: "👥", label: "Manage Users" },
   { to: "/admin/loans", icon: "💳", label: "Manage Loans" },
   { to: "/admin/savings", icon: "🏦", label: "Manage Savings" },
-  { to: "/admin/attendance", icon: "📋", label: "Attendance" },
+  { to: "/admin/payroll", icon: "💰", label: "Payroll Check" },
+  { to: "/admin/ledger", icon: "🧾", label: "Ledger" },
+  // { to: "/admin/attendance", icon: "📋", label: "Attendance" },
   { to: "/admin/reports", icon: "📊", label: "Reports" },
 ];
 

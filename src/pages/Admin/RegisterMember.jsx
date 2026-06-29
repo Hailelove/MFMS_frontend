@@ -32,6 +32,19 @@ const schema = yup.object().shape({
     .oneOf([yup.ref("password")], "Passwords must match"),
   employeeId: yup.string().required("Employee ID is required"),
   phone: yup.string().required("Phone number is required"),
+
+  initialSavingAmount: yup
+    .number()
+    .typeError("Initial saving amount must be a number")
+    .min(0, "Initial saving amount cannot be negative")
+    .required("Initial saving amount is required"),
+
+  initialShareAmount: yup
+    .number()
+    .typeError("Initial share amount must be a number")
+    .min(0, "Initial share amount cannot be negative")
+    .required("Initial share amount is required"),
+
   campusId: yup
     .number()
     .typeError("Campus is required")
@@ -59,6 +72,8 @@ const requiredBulkHeaders = [
   "staffType",
   "department",
   "monthlySalary",
+  "initialSavingAmount",
+  "initialShareAmount",
   "officeUnit",
   "position",
 ];
@@ -101,6 +116,8 @@ const parseCsv = (text) => {
     "campusId",
     "department",
     "monthlySalary",
+    "initialSavingAmount",
+    "initialShareAmount",
   ];
 
   const lines = text
@@ -144,7 +161,7 @@ const parseCsv = (text) => {
 const downloadTemplate = () => {
   const sampleRows = [
     requiredBulkHeaders.join(","),
-    "John Doe,john@example.com,Password@123,EMP-001,+251900000000,1,academic, Software Engineering,15000,ICT Office,Lecturer",
+    "John Doe,john@example.com,Password@123,EMP-001,+251900000000,1,academic,Software Engineering,15000,500,1000,ICT Office,Lecturer",
   ];
 
   const blob = new Blob([sampleRows.join("\n")], {
@@ -173,6 +190,8 @@ const buildPayload = (data) => ({
   officeUnit: data.officeUnit?.trim() || undefined,
   position: data.position?.trim() || undefined,
   monthlySalary: Number(data.monthlySalary),
+  initialSavingAmount: Number(data.initialSavingAmount),
+  initialShareAmount: Number(data.initialShareAmount),
 });
 
 const RegisterMember = () => {
@@ -563,6 +582,51 @@ const RegisterMember = () => {
               {...registerForm("position")}
             />
           </div>
+          <div className="flex flex-col space-y-1.5">
+            <label
+              className="text-sm font-medium text-slate-700"
+              htmlFor="reg-initial-saving"
+            >
+              Initial Saving Amount
+            </label>
+            <input
+              id="reg-initial-saving"
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
+              placeholder="500"
+              {...registerForm("initialSavingAmount")}
+            />
+            {errors.initialSavingAmount && (
+              <p className="text-sm text-red-500">
+                {errors.initialSavingAmount.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col space-y-1.5">
+            <label
+              className="text-sm font-medium text-slate-700"
+              htmlFor="reg-initial-share"
+            >
+              Initial Share Amount
+            </label>
+            <input
+              id="reg-initial-share"
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
+              placeholder="1000"
+              {...registerForm("initialShareAmount")}
+            />
+            {errors.initialShareAmount && (
+              <p className="text-sm text-red-500">
+                {errors.initialShareAmount.message}
+              </p>
+            )}
+          </div>
 
           <div className="flex flex-col space-y-1.5">
             <label
@@ -622,7 +686,8 @@ const RegisterMember = () => {
                   <li>First row must contain the correct column headers.</li>
                   <li>
                     Required columns: fullName, email, password, employeeId,
-                    phone, campusId, department, monthlySalary.
+                    phone, campusId, department, monthlySalary,
+                    initialSavingAmount, initialShareAmount.
                   </li>
                   <li>Optional columns: officeUnit, position.</li>
                   <li>

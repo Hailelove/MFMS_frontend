@@ -15,7 +15,6 @@ const defaultValues = {
 };
 
 const staffDefaultValues = {
-  fullName: "",
   role: "ADMIN",
   campusId: "",
 };
@@ -496,15 +495,15 @@ const CampusRegistration = () => {
                     Staff Type
                   </label>
                   <input
-                    {...register("role", {
+                    {...registerStaff("role", {
                       required: "Staff Type is required",
                     })}
                     placeholder="Admin or Academic"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
                   />
-                  {errors.name && (
+                  {staffErrors.role && (
                     <p className="text-sm text-red-500">
-                      {errors.name.message}
+                      {staffErrors.role.message}
                     </p>
                   )}
                 </div>

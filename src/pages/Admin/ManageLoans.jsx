@@ -8,20 +8,25 @@ import Pagination from "../../components/Pagination";
 const ITEMS_PER_PAGE = 12;
 
 const ManageLoans = () => {
-  const [users, setUsers] = useState([]);
-  const [loans, setLoans] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loansOverview, setLoansOverview] = useState([]);
+  const [loanTypes, setLoanTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedUserId, setSelectedUserId] = useState(null);
-  const [userLedger, setUserLedger] = useState(null);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [memberLoans, setMemberLoans] = useState([]);
+  const [loanLoading, setLoanLoading] = useState(false);
 
-  // Interest calculator state
-  const [interestCalc, setInterestCalc] = useState(null);
-  const [calcLoading, setCalcLoading] = useState(false);
-  const [calcToDate, setCalcToDate] = useState(moment().format("YYYY-MM-DD"));
-  const [showCalcPanel, setShowCalcPanel] = useState(false);
-  const [recordingPeriod, setRecordingPeriod] = useState(null);
+  //new
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const formatMoney = (val) => {
+    const num = Number(val);
+    return isNaN(num) ? "0.00" : num.toFixed(2);
+  };
 
   const {
     register,
@@ -29,33 +34,52 @@ const ManageLoans = () => {
     reset,
     watch,
     formState: { errors },
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      loanTypeId: "",
+      loanPurpose: "",
+      requestedAmount: "",
+      repaymentPeriod: "",
+      approvedAmount: "",
+      interestRate: "",
+      paymentMethod: "CASH",
+      repaymentAmount: "",
+      referenceNo: "",
+    },
+  });
+
   const [txSubmitting, setTxSubmitting] = useState(false);
 
-  const watchType = watch("type");
-
-  // Pagination state
   const [overviewPage, setOverviewPage] = useState(1);
   const [ledgerPage, setLedgerPage] = useState(1);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       const res = await api.get("/admin/users");
-      setUsers(res.data);
-    } catch {
-      // Non-critical
+      setMembers(res.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load members");
+    }
+  }, []);
+
+  const fetchLoanTypes = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/loan-types");
+      setLoanTypes(res.data || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load loan types");
     }
   }, []);
 
   const fetchLoansOverview = useCallback(async () => {
     setLoading(true);
+
     try {
-      const response = await api.get("/admin/loans");
-      setLoans(response.data);
+      const res = await api.get("/admin/loans");
+      setLoansOverview(res.data || []);
     } catch (error) {
       toast.error(
-        "Failed to load loans overview: " +
-          (error.response?.data?.message || error.message),
+        error.response?.data?.message || "Failed to load loans overview",
       );
     } finally {
       setLoading(false);
@@ -64,152 +88,169 @@ const ManageLoans = () => {
 
   useEffect(() => {
     fetchLoansOverview();
-    fetchUsers();
-  }, [fetchLoansOverview, fetchUsers]);
+    fetchMembers();
+    fetchLoanTypes();
+  }, [fetchLoansOverview, fetchMembers, fetchLoanTypes]);
 
-  const fetchUserLedger = async (userId) => {
-    setLedgerLoading(true);
-    setSelectedUserId(userId);
-    setUserLedger(null);
+  const fetchMemberLoans = async (member) => {
+    const memberId = member?.memberId || member?.id;
+
+    if (!memberId) {
+      toast.error("Cannot manage loans: member ID not found.");
+      return;
+    }
+
+    setLoanLoading(true);
+    setSelectedMemberId(memberId);
+    setSelectedMember(member);
+    setMemberLoans([]);
     setLedgerPage(1);
-    setInterestCalc(null);
-    setShowCalcPanel(false);
 
     try {
-      const response = await api.get(`/admin/loans/${userId}`);
-      setUserLedger(response.data);
+      const res = await api.get(`/admin/loans/member/${memberId}`);
+      setMemberLoans(res.data || []);
     } catch (error) {
       toast.error(
-        "Failed to fetch user ledger: " +
-          (error.response?.data?.message || error.message),
+        error.response?.data?.message || "Failed to load member loans",
       );
-      setSelectedUserId(null);
+      setSelectedMemberId(null);
+      setSelectedMember(null);
     } finally {
-      setLedgerLoading(false);
+      setLoanLoading(false);
     }
   };
+  const money = (value) => `ETB ${Number(value || 0).toFixed(2)}`;
 
-  const handleCalculateInterest = async () => {
-    setCalcLoading(true);
-    try {
-      const response = await api.get(
-        `/admin/loans/${selectedUserId}/interest/calculate`,
-        {
-          params: { toDate: calcToDate },
-        },
-      );
-      setInterestCalc(response.data);
-      setShowCalcPanel(true);
-    } catch (error) {
-      toast.error(
-        "Failed to calculate interest: " +
-          (error.response?.data?.message || error.message),
-      );
-    } finally {
-      setCalcLoading(false);
-    }
+  const statusStyles = {
+    PENDING: "bg-amber-50 text-amber-700 border-amber-200",
+    QUEUED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    APPROVED: "bg-blue-50 text-blue-700 border-blue-200",
+    REJECTED: "bg-red-50 text-red-700 border-red-200",
+    DISBURSED: "bg-purple-50 text-purple-700 border-purple-200",
+    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    COMPLETED: "bg-slate-50 text-slate-700 border-slate-200",
+    OVERDUE: "bg-orange-50 text-orange-700 border-orange-200",
+    DEFAULTED: "bg-rose-50 text-rose-700 border-rose-200",
   };
 
-  const handleRecordInterestPeriod = async (period) => {
-    const periodKey = period.periodStart.toString();
-    setRecordingPeriod(periodKey);
+  const getLoanPaid = (loan) =>
+    (loan.repayments || []).reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0,
+    );
+
+  const getLoanBalance = (loan) =>
+    Math.max(
+      Number(loan.approvedAmount || loan.requestedAmount || 0) -
+        getLoanPaid(loan),
+      0,
+    );
+
+  const paymentMethodOptions = [
+    { value: "CASH", label: "Cash" },
+    { value: "BANK", label: "Bank" },
+    { value: "PAYROLL", label: "Payroll" },
+  ];
+
+  const handleCreateLoan = async (data) => {
+    setTxSubmitting(true);
 
     try {
-      await api.post(`/admin/loans/${selectedUserId}/interest`, {
-        periodStart: period.periodStart,
-        periodEnd: period.periodEnd,
-        principalBalance: period.principalBalance,
-        interestRate: period.interestRate,
-        interestAmount: period.interestAmount,
-        date: period.isPartial
-          ? calcToDate
-          : moment(period.periodEnd).format("YYYY-MM-DD"),
-        note: `Interest: 1% of $${period.principalBalance.toFixed(2)} for ${moment(period.periodStart).format("MMM D")} – ${moment(period.periodEnd).format("MMM D, YYYY")}${period.isPartial ? " (partial)" : ""}`,
+      await api.post(`/admin/loans/member/${selectedMemberId}`, {
+        loanTypeId: Number(data.loanTypeId),
+        loanPurpose: data.loanPurpose?.trim() || null,
+        requestedAmount: Number(data.requestedAmount),
+        repaymentPeriod: data.repaymentPeriod
+          ? Number(data.repaymentPeriod)
+          : null,
       });
-      toast.success("Interest period recorded successfully");
 
-      // Refresh ledger and recalculate
-      await fetchUserLedger(selectedUserId);
-      await handleCalculateInterest();
+      toast.success("Loan application created successfully");
+      reset();
+      await fetchMemberLoans(selectedMember);
+      await fetchLoansOverview();
     } catch (error) {
-      // 409 = already recorded (idempotency guard fired) — refresh so UI reflects reality
-      if (error.response?.status === 409) {
-        toast.info("This period was already recorded — refreshing.");
-        await fetchUserLedger(selectedUserId);
-        await handleCalculateInterest();
-      } else {
-        toast.error(
-          error.response?.data?.message || "Failed to record interest period",
-        );
-      }
+      toast.error(error.response?.data?.message || "Failed to create loan");
     } finally {
-      setRecordingPeriod(null);
+      setTxSubmitting(false);
     }
   };
 
-  const [applyingUnrecorded, setApplyingUnrecorded] = useState(false);
+  const handleApproveLoan = async (loan) => {
+    const approvedAmount = window.prompt(
+      "Enter Approved Amount:",
+      formatMoney(loan.requestedAmount),
+    );
 
-  // Delete-transaction state
-  const [deleteModal, setDeleteModal] = useState(null); // { tx } | null
-  const [deleteReason, setDeleteReason] = useState("");
-  const [deleting, setDeleting] = useState(false);
+    if (!approvedAmount) return;
 
-  const handleApplyUnrecordedInterest = async () => {
+    try {
+      await api.patch(`/admin/loans/${loan.id}/approve`, {
+        approvedAmount: Number(approvedAmount),
+        // Use interestRate from loanType if not specified in loan
+        interestRate: Number(
+          loan.interestRate || loan.loanType?.interestRate || 0,
+        ),
+        repaymentPeriod: Number(loan.repaymentPeriod || 1),
+      });
+
+      toast.success("Loan approved and interest locked.");
+      await fetchMemberLoans(selectedMember);
+      await fetchLoansOverview();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Approval failed.");
+    }
+  };
+
+  const handleRejectLoan = async (loan) => {
+    if (!window.confirm("Reject this loan application?")) return;
+
+    try {
+      await api.patch(`/admin/loans/${loan.id}/reject`);
+      toast.success("Loan rejected");
+      await fetchMemberLoans(selectedMember);
+      await fetchLoansOverview();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to reject loan");
+    }
+  };
+
+  const handleDisburseLoan = async (loan) => {
     if (
-      !interestCalc ||
-      interestCalc.totalUnrecorded <= 0 ||
-      applyingUnrecorded
+      !window.confirm(
+        "Disburse this loan? This will initialize the repayment schedule.",
+      )
     )
       return;
 
-    setApplyingUnrecorded(true);
+    try {
+      await api.patch(`/admin/loans/${loan.id}/disburse`);
+      toast.success("Loan disbursed successfully.");
+      await fetchMemberLoans(selectedMember);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Disbursement failed.");
+    }
+  };
+
+  const handleRepayment = async (loan) => {
+    const amount = window.prompt("Repayment amount");
+
+    if (!amount) return;
 
     try {
-      const response = await api.post(
-        `/admin/loans/${selectedUserId}/interest/apply-unrecorded`,
-        { toDate: calcToDate },
-      );
+      await api.post(`/admin/loans/${loan.id}/repayments`, {
+        amount: Number(amount),
+        paymentMethod: watch("paymentMethod") || "CASH",
+        referenceNo: watch("referenceNo") || null,
+      });
 
-      if (response.data && response.data.updatedInterestBalance !== undefined) {
-        setUserLedger((prev) =>
-          prev
-            ? {
-                ...prev,
-                summary: {
-                  ...prev.summary,
-                  interestBalance: response.data.updatedInterestBalance,
-                  totalInterestAccrued:
-                    response.data.updatedInterestAccrued ??
-                    prev.summary.totalInterestAccrued,
-                  totalInterestRepaid:
-                    response.data.updatedInterestRepaid ??
-                    prev.summary.totalInterestRepaid,
-                  totalOutstanding:
-                    response.data.updatedTotalOutstanding ??
-                    prev.summary.totalOutstanding,
-                },
-              }
-            : null,
-        );
-      }
-
-      const periodsApplied = response.data?.periodsApplied ?? 0;
-      if (periodsApplied === 0) {
-        toast.info("No new unrecorded interest periods to apply.");
-      } else {
-        toast.success(
-          `Applied ${periodsApplied} interest period${periodsApplied !== 1 ? "s" : ""} successfully`,
-        );
-      }
-
-      await fetchUserLedger(selectedUserId);
-      await handleCalculateInterest();
+      toast.success("Repayment recorded");
+      await fetchMemberLoans(selectedMember);
+      await fetchLoansOverview();
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Failed to apply unrecorded interest",
+        error.response?.data?.message || "Failed to record repayment",
       );
-    } finally {
-      setApplyingUnrecorded(false);
     }
   };
 
@@ -224,81 +265,10 @@ const ManageLoans = () => {
     setDeleteReason("");
   };
 
-  const handleDeleteTransaction = async () => {
-    if (!deleteModal || deleting) return;
-
-    const { tx } = deleteModal;
-    setDeleting(true);
-    try {
-      const res = await api.delete(
-        `/admin/loans/${selectedUserId}/transaction/${tx._id}`,
-        { data: { reason: deleteReason.trim() } },
-      );
-
-      toast.success("Transaction deleted successfully");
-      setDeleteModal(null);
-      setDeleteReason("");
-
-      if (res.data?.summaryAfter) {
-        setUserLedger((prev) =>
-          prev ? { ...prev, summary: res.data.summaryAfter } : null,
-        );
-      }
-
-      setUserLedger((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          transactions: prev.transactions.filter((t) => t._id !== tx._id),
-        };
-      });
-
-      fetchLoansOverview();
-      if (showCalcPanel) handleCalculateInterest();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to delete transaction",
-      );
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleTxSubmit = async (data) => {
-    setTxSubmitting(true);
-    try {
-      const payload = {
-        type: data.type,
-        amount: parseFloat(data.amount),
-        date: data.date,
-        note: data.note || "",
-      };
-
-      if (data.type === "repayment") {
-        payload.paymentTarget = data.paymentTarget;
-      }
-
-      await api.post(`/admin/loans/${selectedUserId}/transaction`, payload);
-      toast.success("Transaction recorded successfully");
-      reset();
-      fetchUserLedger(selectedUserId);
-      fetchLoansOverview();
-
-      if (showCalcPanel) {
-        handleCalculateInterest();
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to add transaction");
-    } finally {
-      setTxSubmitting(false);
-    }
-  };
-
   const goBack = () => {
-    setSelectedUserId(null);
-    setUserLedger(null);
-    setInterestCalc(null);
-    setShowCalcPanel(false);
+    setSelectedMemberId(null);
+    setSelectedMember(null);
+    setMemberLoans([]);
     setOverviewPage(1);
   };
 
@@ -310,23 +280,32 @@ const ManageLoans = () => {
     );
   }
 
-  const allMembers = users.map((u) => {
-    const loanRow = loans.find((l) => String(l.userId) === String(u._id));
-    return (
-      loanRow || {
-        userId: u._id,
-        name: u.name,
-        email: u.email,
-        totalDisbursed: 0,
-        totalPrincipalRepaid: 0,
-        totalInterestAccrued: 0,
-        totalFines: 0,
-        totalInterestRepaid: 0,
-        principalBalance: 0,
-        interestBalance: 0,
-        totalOutstanding: 0,
-      }
+  const allMembers = members.map((member) => {
+    const memberId = member.memberId || member.id;
+
+    const overview = loansOverview.find(
+      (item) => String(item.memberId || item.id) === String(memberId),
     );
+
+    return {
+      ...member,
+      ...overview,
+      id: memberId,
+      memberId,
+      fullName:
+        overview?.fullName ||
+        member.fullName ||
+        member.name ||
+        "Unnamed Member",
+      email: overview?.email || member.email || member.user?.email || "",
+      activeLoanBalance:
+        overview?.activeLoanBalance ??
+        member.memberBalance?.activeLoanBalance ??
+        0,
+      totalLoanPaid:
+        overview?.totalLoanPaid ?? member.memberBalance?.totalLoanPaid ?? 0,
+      activeLoans: overview?.activeLoans || 0,
+    };
   });
 
   const paginatedMembers = allMembers.slice(
@@ -334,50 +313,10 @@ const ManageLoans = () => {
     overviewPage * ITEMS_PER_PAGE,
   );
 
-  const transactions = userLedger?.transactions || [];
-  const paginatedTx = transactions.slice(
+  const paginatedLoans = memberLoans.slice(
     (ledgerPage - 1) * ITEMS_PER_PAGE,
     ledgerPage * ITEMS_PER_PAGE,
   );
-  const summary = userLedger?.summary;
-
-  const txTypeBadge = (tx) => {
-    const styles = {
-      loan: { bg: "bg-red-50 text-red-700 border-red-200", label: "Loan" },
-      repayment: {
-        bg:
-          tx.paymentTarget === "interest"
-            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-            : "bg-green-50 text-green-700 border-green-200",
-        label:
-          tx.paymentTarget === "interest"
-            ? "Repayment (Interest)"
-            : tx.paymentTarget === "principal"
-              ? "Repayment (Principal)"
-              : "Repayment",
-      },
-      interest: {
-        bg: "bg-amber-50 text-amber-700 border-amber-200",
-        label: "Interest",
-      },
-      fine: {
-        bg: "bg-indigo-50 text-indigo-700 border-indigo-200",
-        label: "Fine",
-      },
-    };
-    const s = styles[tx.type] || {
-      bg: "bg-slate-50 text-slate-700 border-slate-200",
-      label: tx.type,
-    };
-
-    return (
-      <span
-        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${s.bg} whitespace-nowrap`}
-      >
-        {s.label}
-      </span>
-    );
-  };
 
   return (
     <div className="p-1 sm:p-4 max-w-7xl mx-auto space-y-6 text-slate-800">
@@ -391,7 +330,7 @@ const ManageLoans = () => {
             Track balances, apply interest cycles, and register payments.
           </p>
         </div>
-        {selectedUserId && (
+        {selectedMemberId && (
           <button
             className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg shadow-sm hover:bg-slate-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
             onClick={goBack}
@@ -401,7 +340,7 @@ const ManageLoans = () => {
         )}
       </div>
 
-      {!selectedUserId ? (
+      {!selectedMemberId ? (
         <>
           {allMembers.length === 0 ? (
             <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-8 text-center">
@@ -430,41 +369,34 @@ const ManageLoans = () => {
                   <tbody className="divide-y divide-slate-200 text-sm">
                     {paginatedMembers.map((member) => (
                       <tr
-                        key={member.userId}
+                        key={member.memberId}
                         className="hover:bg-slate-50/70 transition-colors"
                       >
                         <td className="px-6 py-4">
                           <div className="font-semibold text-slate-900">
-                            {member.name}
+                            {member.fullName}
                           </div>
                           <div className="text-xs text-slate-500">
                             {member.email}
                           </div>
                         </td>
-                        <td
-                          className={`px-6 py-4 text-right font-semibold ${(member.principalBalance || 0) > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                        >
-                          ${(member.principalBalance || 0).toFixed(2)}
+                        <td className="px-6 py-4 text-right font-semibold text-rose-600">
+                          {money(member.activeLoanBalance)}
                         </td>
-                        <td
-                          className={`px-6 py-4 text-right font-semibold ${(member.interestBalance || 0) > 0 ? "text-amber-600" : "text-emerald-600"}`}
-                        >
-                          ${(member.interestBalance || 0).toFixed(2)}
+                        <td className="px-6 py-4 text-right font-semibold text-emerald-600">
+                          {money(member.totalLoanPaid)}
                         </td>
-                        <td
-                          className={`px-6 py-4 text-right font-bold ${(member.totalOutstanding || 0) > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                        >
-                          ${(member.totalOutstanding || 0).toFixed(2)}
+                        <td className="px-6 py-4 text-right text-slate-600">
+                          {member.activeLoans || 0}
                         </td>
-                        <td className="px-6 py-4 text-right text-slate-600 font-medium">
-                          ${(member.totalDisbursed || 0).toFixed(2)}
-                        </td>
+
                         <td className="px-6 py-4 text-center">
                           <button
-                            className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            onClick={() => fetchUserLedger(member.userId)}
+                            type="button"
+                            onClick={() => fetchMemberLoans(member)}
+                            className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
                           >
-                            View / Add
+                            Manage Loans
                           </button>
                         </td>
                       </tr>
@@ -487,369 +419,117 @@ const ManageLoans = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Ledger Section */}
           <div className="lg:col-span-2 space-y-6">
-            {ledgerLoading ? (
-              <div className="flex justify-center items-center h-48 bg-white border border-slate-200 rounded-xl shadow-sm">
+            {loanLoading ? (
+              <div className="flex justify-center items-center h-48 bg-white border border-slate-200 rounded-xl">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
               </div>
-            ) : userLedger ? (
-              <>
-                {/* Balance Summary Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Principal Section Card */}
-                  <div className="bg-white border-l-4 border-rose-500 rounded-xl shadow-sm p-5 border border-slate-200">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Principal Balance
-                    </div>
-                    <div
-                      className={`text-2xl font-extrabold ${summary.principalBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                    >
-                      ${summary.principalBalance.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100 flex justify-between">
-                      <span>
-                        Disbursed:{" "}
-                        <strong>${summary.totalDisbursed.toFixed(2)}</strong>
-                      </span>
-                      <span>
-                        Repaid:{" "}
-                        <strong>
-                          ${summary.totalPrincipalRepaid.toFixed(2)}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Interest Section Card */}
-                  <div className="bg-white border-l-4 border-amber-500 rounded-xl shadow-sm p-5 border border-slate-200">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Interest Balance
-                    </div>
-                    <div
-                      className={`text-2xl font-extrabold ${summary.interestBalance > 0 ? "text-amber-700" : "text-emerald-600"}`}
-                    >
-                      ${summary.interestBalance.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100 space-x-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                      <span>
-                        Acc:{" "}
-                        <strong>
-                          ${summary.totalInterestAccrued.toFixed(2)}
-                        </strong>
-                      </span>
-                      <span>
-                        • Fines:{" "}
-                        <strong>${summary.totalFines.toFixed(2)}</strong>
-                      </span>
-                      <span>
-                        • Paid:{" "}
-                        <strong>
-                          ${summary.totalInterestRepaid.toFixed(2)}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Total Outstanding Hero Block */}
-                <div
-                  className={`border-l-4 p-4 rounded-xl shadow-sm border ${summary.totalOutstanding > 0 ? "bg-rose-50/50 border-rose-500" : "bg-emerald-50/50 border-emerald-500"}`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-sm text-slate-700">
-                      Total Outstanding Balance{" "}
-                      <span className="text-xs text-slate-400 font-normal">
-                        (Principal + Interest)
-                      </span>
-                    </span>
-                    <span
-                      className={`text-xl font-black ${summary.totalOutstanding > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                    >
-                      ${summary.totalOutstanding.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Calculate Interest to Date Panel */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                      <span>📊</span> Calculate Interest to Date
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <input
-                        type="date"
-                        className="w-full sm:w-auto px-3 py-1.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                        value={calcToDate}
-                        onChange={(e) => setCalcToDate(e.target.value)}
-                      />
-                      <button
-                        className="px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap"
-                        onClick={handleCalculateInterest}
-                        disabled={calcLoading}
-                      >
-                        {calcLoading ? "Calculating..." : "🔢 Calculate"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {showCalcPanel && interestCalc && (
-                    <div className="pt-4 border-t border-slate-100 space-y-4 animate-fadeIn">
-                      {/* Breakdown mini-cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                            Total Interest to Date
-                          </div>
-                          <div className="text-lg font-bold text-amber-600 mt-0.5">
-                            ${interestCalc.totalInterestToDate.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 text-center">
-                          <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-600/70">
-                            Already Recorded
-                          </div>
-                          <div className="text-lg font-bold text-emerald-600 mt-0.5">
-                            ${interestCalc.totalAlreadyRecorded.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-3 text-center flex flex-col justify-between items-center gap-2">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider font-bold text-amber-800/70">
-                              Unrecorded Balance
-                            </div>
-                            <div className="text-lg font-bold text-amber-900 mt-0.5">
-                              ${interestCalc.totalUnrecorded.toFixed(2)}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="w-full py-1 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 rounded shadow-sm transition-colors"
-                            onClick={handleApplyUnrecordedInterest}
-                            disabled={
-                              interestCalc.totalUnrecorded <= 0 ||
-                              applyingUnrecorded
-                            }
-                            aria-label="Apply unrecorded interest to loan balance"
-                            title={
-                              interestCalc.totalUnrecorded <= 0
-                                ? "No unrecorded interest to apply"
-                                : "Apply unrecorded interest to interest balance"
-                            }
-                          >
-                            {applyingUnrecorded ? "Applying..." : "Apply All"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Period breakdown table */}
-                      {interestCalc.periods.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic text-center py-2">
-                          No interest periods found. Ensure a loan disbursement
-                          exists.
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto border border-slate-100 rounded-lg">
-                          <table className="w-full text-xs text-left border-collapse">
-                            <thead>
-                              <tr className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
-                                <th className="px-3 py-2">Period</th>
-                                <th className="px-3 py-2 text-right">Days</th>
-                                <th className="px-3 py-2 text-right">
-                                  Principal
-                                </th>
-                                <th className="px-3 py-2 text-right">Rate</th>
-                                <th className="px-3 py-2 text-right">
-                                  Interest
-                                </th>
-                                <th className="px-3 py-2 text-center">
-                                  Status
-                                </th>
-                                <th className="px-3 py-2 text-center">
-                                  Action
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {interestCalc.periods.map((period, idx) => (
-                                <tr
-                                  key={idx}
-                                  className={`hover:bg-slate-50/80 transition-colors ${period.alreadyRecorded ? "bg-slate-50 text-slate-400" : period.isPartial ? "bg-amber-50/30" : "bg-white"}`}
-                                >
-                                  <td className="px-3 py-2 font-medium">
-                                    {moment(period.periodStart).format("MMM D")}{" "}
-                                    –{" "}
-                                    {moment(period.periodEnd).format(
-                                      "MMM D, YYYY",
-                                    )}
-                                    {period.isPartial && (
-                                      <span className="ml-1.5 inline-block text-[10px] font-bold px-1 bg-amber-100 text-amber-800 rounded">
-                                        partial
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 text-right">
-                                    {period.daysInPeriod}
-                                  </td>
-                                  <td className="px-3 py-2 text-right font-medium">
-                                    ${period.principalBalance.toFixed(2)}
-                                  </td>
-                                  <td className="px-3 py-2 text-right">
-                                    {(period.interestRate * 100).toFixed(1)}%
-                                    {period.isPartial ? "*" : ""}
-                                  </td>
-                                  <td className="px-3 py-2 text-right font-bold text-amber-700">
-                                    ${period.interestAmount.toFixed(2)}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
-                                    {period.alreadyRecorded ? (
-                                      <span className="font-semibold text-emerald-600">
-                                        ✓ Recorded
-                                      </span>
-                                    ) : (
-                                      <span className="font-semibold text-amber-500">
-                                        Pending
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
-                                    {!period.alreadyRecorded && (
-                                      <button
-                                        className="px-2 py-0.5 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 rounded transition-colors"
-                                        onClick={() =>
-                                          handleRecordInterestPeriod(period)
-                                        }
-                                        disabled={
-                                          recordingPeriod ===
-                                          period.periodStart.toString()
-                                        }
-                                      >
-                                        {recordingPeriod ===
-                                        period.periodStart.toString()
-                                          ? "..."
-                                          : "Record"}
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {interestCalc.periods.some((p) => p.isPartial) && (
-                            <p className="text-[10px] text-slate-400 p-2 bg-slate-50 border-t border-slate-100">
-                              * Partial period interest is pro-rated: (principal
-                              × 1% × days) ÷ 28
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Transaction Ledger Table Card */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-800">
-                      Full Ledger —{" "}
-                      <span className="text-blue-600">
-                        {userLedger.user.name}
-                      </span>
-                    </h3>
-                  </div>
-                  {transactions.length === 0 ? (
-                    <p className="p-6 text-sm text-slate-400 italic text-center">
-                      No transactions yet. Add one using the form.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-sm">
-                          <thead>
-                            <tr className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                              <th className="px-4 py-3">Date</th>
-                              <th className="px-4 py-3">Type</th>
-                              <th className="px-4 py-3 text-right">Amount</th>
-                              <th className="px-4 py-3">Recorded By</th>
-                              <th className="px-4 py-3">Note / Period</th>
-                              <th className="px-4 py-3 text-center">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {paginatedTx.map((tx) => (
-                              <tr
-                                key={tx._id}
-                                className="hover:bg-slate-50/50 transition-colors"
-                              >
-                                <td className="px-4 py-3 whitespace-nowrap text-slate-600">
-                                  {moment(tx.date).format("MMM Do YYYY")}
-                                </td>
-                                <td className="px-4 py-3">{txTypeBadge(tx)}</td>
-                                <td
-                                  className={`px-4 py-3 text-right font-semibold ${tx.type === "repayment" ? "text-emerald-600" : tx.type === "interest" ? "text-amber-600" : "text-slate-900"}`}
-                                >
-                                  {tx.type === "repayment" ? "-" : "+"}$
-                                  {tx.amount.toFixed(2)}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-slate-500">
-                                  {tx.recordedBy?.name || "Auto"}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
-                                  {tx.type === "interest" &&
-                                  tx.interestPeriod?.periodStart ? (
-                                    <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">
-                                      {moment(
-                                        tx.interestPeriod.periodStart,
-                                      ).format("MMM D")}{" "}
-                                      –{" "}
-                                      {moment(
-                                        tx.interestPeriod.periodEnd,
-                                      ).format("MMM D, YYYY")}{" "}
-                                      @{" "}
-                                      {(
-                                        (tx.interestPeriod.interestRate ||
-                                          0.01) * 100
-                                      ).toFixed(1)}
-                                      % on $
-                                      {(
-                                        tx.interestPeriod.principalBalance || 0
-                                      ).toFixed(2)}
-                                    </span>
-                                  ) : (
-                                    tx.note || "—"
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => openDeleteModal(tx)}
-                                    aria-label={`Delete transaction of $${tx.amount.toFixed(2)} on ${moment(tx.date).format("MMM Do YYYY")}`}
-                                    className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-white border border-rose-200 hover:bg-rose-600 rounded-md shadow-sm transition-all focus:outline-none"
-                                  >
-                                    Delete
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="border-t border-slate-200 p-4">
-                        <Pagination
-                          currentPage={ledgerPage}
-                          totalItems={transactions.length}
-                          itemsPerPage={ITEMS_PER_PAGE}
-                          onPageChange={setLedgerPage}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
             ) : (
-              <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl text-center">
-                <p className="text-sm font-semibold text-rose-600">
-                  Could not load ledger. Please try again.
-                </p>
+              <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                <div className="p-4 bg-slate-50 border-b border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Loans for{" "}
+                    <span className="text-blue-600">
+                      {selectedMember?.fullName}
+                    </span>
+                  </h3>
+                </div>
+
+                {memberLoans.length === 0 ? (
+                  <p className="p-6 text-sm text-slate-400 italic text-center">
+                    No loans registered for this member.
+                  </p>
+                ) : (
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+                        <th className="px-4 py-3">Applied</th>
+                        <th className="px-4 py-3">Loan Type</th>
+                        <th className="px-4 py-3 text-right">Requested</th>
+                        <th className="px-4 py-3 text-right">Approved</th>
+                        <th className="px-4 py-3 text-right">Balance</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {paginatedLoans.map((loan) => (
+                        <tr key={loan.id}>
+                          <td className="px-4 py-3">
+                            {moment(loan.applicationDate).format("MMM D, YYYY")}
+                          </td>
+                          <td className="px-4 py-3">
+                            {loan.loanType?.name || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {money(loan.requestedAmount)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {loan.approvedAmount
+                              ? money(loan.approvedAmount)
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold">
+                            {money(getLoanBalance(loan))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs border ${statusStyles[loan.status] || statusStyles.PENDING}`}
+                            >
+                              {loan.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center space-x-2">
+                            {loan.status === "PENDING" && (
+                              <>
+                                <button
+                                  onClick={() => handleApproveLoan(loan)}
+                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRejectLoan(loan)}
+                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+
+                            {loan.status === "APPROVED" && (
+                              <button
+                                onClick={() => handleDisburseLoan(loan)}
+                                className="px-2 py-1 text-xs bg-purple-600 text-white rounded"
+                              >
+                                Disburse
+                              </button>
+                            )}
+
+                            {["DISBURSED", "ACTIVE", "OVERDUE"].includes(
+                              loan.status,
+                            ) && (
+                              <button
+                                onClick={() => handleRepayment(loan)}
+                                className="px-2 py-1 text-xs bg-emerald-600 text-white rounded"
+                              >
+                                Repay
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                <div className="border-t border-slate-200 p-4">
+                  <Pagination
+                    currentPage={ledgerPage}
+                    totalItems={memberLoans.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setLedgerPage}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -859,115 +539,58 @@ const ManageLoans = () => {
             <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
               Add Transaction
             </h3>
-            <form onSubmit={handleSubmit(handleTxSubmit)} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Transaction Type
-                </label>
-                <select
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                  {...register("type", { required: true })}
-                >
-                  <option value="">— Select Type —</option>
-                  <option value="loan">New Loan (Disbursement)</option>
-                  <option value="repayment">Repayment</option>
-                  <option value="fine">Fine / Penalty</option>
-                </select>
-                {errors.type && (
-                  <p className="text-xs text-rose-500 font-medium">
-                    Please select a type
-                  </p>
-                )}
-              </div>
 
-              {/* Payment Target — only shown for repayments */}
-              {watchType === "repayment" && (
-                <div className="flex flex-col gap-1.5 animate-slideDown">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Apply Payment To
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                    {...register("paymentTarget", {
-                      required: watchType === "repayment",
-                    })}
-                  >
-                    <option value="">— Select Target —</option>
-                    <option value="interest">Interest Balance</option>
-                    <option value="principal">Principal Balance</option>
-                  </select>
-                  {errors.paymentTarget && (
-                    <p className="text-xs text-rose-500 font-medium">
-                      Please select where to apply this payment
-                    </p>
-                  )}
+            <form
+              onSubmit={handleSubmit(handleCreateLoan)}
+              className="space-y-4"
+            >
+              <select {...register("loanTypeId", { required: true })}>
+                <option value="">Select loan type</option>
+                {loanTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name} - {Number(type.interestRate)}%
+                  </option>
+                ))}
+              </select>
 
-                  <p className="text-[11px] text-blue-600 font-medium bg-blue-50 p-2 rounded border border-blue-100 mt-1">
-                    {watch("paymentTarget") === "interest"
-                      ? "💡 This payment will reduce the outstanding interest balance."
-                      : watch("paymentTarget") === "principal"
-                        ? "💡 This payment will reduce the outstanding principal balance."
-                        : ""}
-                  </p>
-                </div>
-              )}
+              <input
+                type="text"
+                placeholder="Loan purpose"
+                {...register("loanPurpose")}
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Amount ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                  placeholder="0.00"
-                  {...register("amount", { required: true, min: 0.01 })}
-                />
-                {errors.amount && (
-                  <p className="text-xs text-rose-500 font-medium">
-                    Enter a valid amount
-                  </p>
-                )}
-              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                placeholder="Requested amount"
+                {...register("requestedAmount", { required: true, min: 1 })}
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                  defaultValue={moment().format("YYYY-MM-DD")}
-                  {...register("date", { required: true })}
-                />
-                {errors.date && (
-                  <p className="text-xs text-rose-500 font-medium">
-                    Date is required
-                  </p>
-                )}
-              </div>
+              <input
+                type="number"
+                min="1"
+                placeholder="Repayment period in months"
+                {...register("repaymentPeriod")}
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Note (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
-                  placeholder="e.g. Initial loan disbursement"
-                  {...register("note")}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
-                disabled={txSubmitting}
-              >
-                {txSubmitting ? "Recording..." : "Record Transaction"}
+              <button type="submit" disabled={txSubmitting}>
+                {txSubmitting ? "Saving..." : "Create Loan Application"}
               </button>
             </form>
+            <select {...register("paymentMethod")}>
+              {paymentMethodOptions.map((method) => (
+                <option key={method.value} value={method.value}>
+                  {method.label}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              placeholder="Repayment reference no."
+              {...register("referenceNo")}
+            />
 
             {/* Modernized Info Box */}
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-2">
