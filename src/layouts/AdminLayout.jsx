@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: "/admin/ledger", icon: "🧾", label: "Ledger" },
   // { to: "/admin/attendance", icon: "📋", label: "Attendance" },
   { to: "/admin/reports", icon: "📊", label: "Reports" },
+  { to: "/admin/system_config", icon: "⚙️", label: "System Config" },
 ];
 
 const AdminLayout = () => {

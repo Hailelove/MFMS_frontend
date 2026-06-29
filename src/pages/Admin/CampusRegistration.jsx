@@ -7,15 +7,12 @@ const defaultValues = {
   name: "",
   code: "",
   location: "",
-  contactPerson: "",
-  contactNumber: "",
-  email: "",
   status: true,
   description: "",
 };
 
 const staffDefaultValues = {
-  role: "ADMIN",
+  staffTypeId: "",
   campusId: "",
 };
 
@@ -26,6 +23,78 @@ const CampusRegistration = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [isStaffSubmitting, setIsStaffSubmitting] = useState(false);
+
+  const [editStaffType, setEditStaffType] = useState(null);
+  const [editName, setEditName] = useState("");
+
+  const openEditStaffType = (type) => {
+    setEditStaffType(type);
+    setEditName(type.name);
+  };
+
+  const closeEditStaffType = () => {
+    setEditStaffType(null);
+    setEditName("");
+  };
+
+  const [staffTypes, setStaffTypes] = useState([]);
+  const [viewMode, setViewMode] = useState("list");
+  // Fetch existing types
+  const fetchStaffTypes = async () => {
+    try {
+      const res = await api.get("/campuses/staff-types"); // Ensure this endpoint exists
+      setStaffTypes(res.data);
+    } catch (err) {
+      toast.error("Failed to load staff types", err);
+    }
+  };
+
+  const updateStaffType = async () => {
+    if (!editName || !editName.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+
+    try {
+      const res = await api.put(`/campuses/staff-types/${editStaffType.id}`, {
+        name: editName.trim(),
+      });
+
+      // const updated = res.data;
+
+      // UPDATE LOCAL STATE
+      setStaffTypes((prev) =>
+        prev.map((item) => (item.id === res.data.id ? res.data : item)),
+      );
+
+      toast.success("Staff type updated successfully!");
+      closeEditStaffType();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Update failed");
+    }
+  };
+
+  const deleteStaffType = async (id) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this staff type?",
+    );
+    if (!confirmed) return;
+
+    try {
+      // Make sure your backend route exists: DELETE /api/staff-types/:id
+      await api.delete(`/campuses/staff-types/${id}`);
+      setStaffTypes((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Deleted successfully!");
+    } catch (err) {
+      // This will catch the 'Restrict' error if staff are still using this type
+      fetchStaffTypes(); // rollback refresh
+      toast.error(
+        err.response?.data?.message ||
+          "Cannot delete: Staff are assigned to this type.",
+      );
+    }
+  };
+
   const {
     register: registerStaff,
     handleSubmit: handleStaffSubmit,
@@ -35,8 +104,11 @@ const CampusRegistration = () => {
     defaultValues: staffDefaultValues,
   });
   const openCreateStaffModal = () => {
-    resetStaff(staffDefaultValues);
+    // resetStaff(staffDefaultValues);
+    // setIsStaffModalOpen(true);
+    setViewMode("list");
     setIsStaffModalOpen(true);
+    fetchStaffTypes();
   };
 
   const closeStaffModal = () => {
@@ -47,15 +119,22 @@ const CampusRegistration = () => {
   const onSubmitStaff = async (data) => {
     setIsStaffSubmitting(true);
 
-    const payload = {
-      //   userId: Number(data.userId),
-      role: data.role,
-      campusId: Number(data.campusId),
-    };
-
     try {
-      await api.post("/staff", payload);
-      toast.success("Staff role assigned successfully!");
+      // STEP 1: create staff type (IMPORTANT FIX HERE)
+      const res = await api.post("/campuses/staff-types", {
+        name: data.staffTypeName.trim(), // 🔥 MUST be "name"
+      });
+
+      const staffTypeId = res.data.id;
+
+      // STEP 2: assign to campus
+      await api.post("/campuses/campus-staff-types", {
+        campusId: Number(data.campusId),
+        staffTypeId: staffTypeId,
+      });
+
+      toast.success("Staff type created and assigned successfully!");
+
       closeStaffModal();
       fetchCampuses();
     } catch (err) {
@@ -64,6 +143,7 @@ const CampusRegistration = () => {
       setIsStaffSubmitting(false);
     }
   };
+
   const {
     register,
     handleSubmit,
@@ -99,9 +179,6 @@ const CampusRegistration = () => {
       name: campus.name || "",
       code: campus.code || "",
       location: campus.location || "",
-      contactPerson: campus.contactPerson || "",
-      contactNumber: campus.contactNumber || "",
-      email: campus.email || "",
       status: campus.status ?? true,
       description: campus.description || "",
     });
@@ -119,12 +196,9 @@ const CampusRegistration = () => {
     setIsSubmitting(true);
 
     const payload = {
-      name: data.name.trim(),
+      name: data.name?.trim(),
       code: data.code.trim(),
       location: data.location?.trim() || null,
-      contactPerson: data.contactPerson?.trim() || null,
-      contactNumber: data.contactNumber?.trim() || null,
-      email: data.email?.trim() || null,
       status: data.status === true || data.status === "true",
       description: data.description?.trim() || null,
     };
@@ -170,8 +244,7 @@ const CampusRegistration = () => {
 
   const handleToggleStatus = async (campus) => {
     try {
-      await api.put(`/campuses/${campus.id}`, {
-        ...campus,
+      await api.patch(`/campuses/${campus.id}/status`, {
         status: !campus.status,
       });
 
@@ -237,7 +310,6 @@ const CampusRegistration = () => {
                   <th className="p-3 font-semibold text-slate-700">Campus</th>
                   <th className="p-3 font-semibold text-slate-700">Code</th>
                   <th className="p-3 font-semibold text-slate-700">Location</th>
-                  <th className="p-3 font-semibold text-slate-700">Contact</th>
                   <th className="p-3 font-semibold text-slate-700">Status</th>
                   <th className="p-3 font-semibold text-slate-700 text-right">
                     Management
@@ -266,13 +338,6 @@ const CampusRegistration = () => {
 
                     <td className="p-3 text-slate-700">
                       {campus.location || "-"}
-                    </td>
-
-                    <td className="p-3 text-slate-700">
-                      <div>{campus.contactPerson || "-"}</div>
-                      <div className="text-xs text-slate-500">
-                        {campus.contactNumber || campus.email || ""}
-                      </div>
                     </td>
 
                     <td className="p-3">
@@ -377,47 +442,13 @@ const CampusRegistration = () => {
                   )}
                 </div>
 
-                <div className="space-y-1 md:col-span-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">
                     Location
                   </label>
                   <input
                     {...register("location")}
-                    placeholder="Addis Ababa"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    Contact Person
-                  </label>
-                  <input
-                    {...register("contactPerson")}
-                    placeholder="Abebe Kebede"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    Contact Number
-                  </label>
-                  <input
-                    {...register("contactNumber")}
-                    placeholder="+251900000000"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    {...register("email")}
-                    placeholder="campus@example.com"
+                    placeholder="Tulu Awlia"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
                   />
                 </div>
@@ -477,7 +508,7 @@ const CampusRegistration = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-xl font-bold text-slate-800">Create Staff</h3>
+              {/* <h3 className="text-xl font-bold text-slate-800">Create Staff</h3>
 
               <button
                 type="button"
@@ -485,78 +516,158 @@ const CampusRegistration = () => {
                 className="text-slate-500 hover:text-slate-900 text-2xl leading-none"
               >
                 ×
+              </button> */}
+              <h3 className="text-xl font-bold">Manage Staff Types</h3>
+              <button onClick={closeStaffModal} className="text-2xl">
+                ×
               </button>
             </div>
-
-            <form onSubmit={handleStaffSubmit(onSubmitStaff)}>
-              <div className="px-6 py-5 grid grid-cols-1 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    Staff Type
-                  </label>
-                  <input
-                    {...registerStaff("role", {
-                      required: "Staff Type is required",
-                    })}
-                    placeholder="Admin or Academic"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
-                  />
-                  {staffErrors.role && (
-                    <p className="text-sm text-red-500">
-                      {staffErrors.role.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    Campus
-                  </label>
-                  <select
-                    {...registerStaff("campusId", {
-                      required: "Campus is required",
-                    })}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
-                  >
-                    <option value="">Select campus</option>
-                    {campuses.map((campus) => (
-                      <option key={campus.id} value={campus.id}>
-                        {campus.name} ({campus.code})
-                      </option>
-                    ))}
-                  </select>
-                  {staffErrors.campusId && (
-                    <p className="text-sm text-red-500">
-                      {staffErrors.campusId.message}
-                    </p>
-                  )}
-
-                  {campuses.length === 0 && (
-                    <p className="text-sm text-amber-600">
-                      Please create a campus first before registering staff.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+            <div className="p-6">
+              {/* Toggle Buttons */}
+              <div className="flex gap-2 mb-6">
                 <button
-                  type="button"
-                  onClick={closeStaffModal}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50"
+                  onClick={() => setViewMode("list")}
+                  className={`px-4 py-2 rounded-lg ${viewMode === "list" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
                 >
-                  Cancel
+                  View All
                 </button>
-
                 <button
-                  type="submit"
-                  disabled={isStaffSubmitting || campuses.length === 0}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                  onClick={() => setViewMode("create")}
+                  className={`px-4 py-2 rounded-lg ${viewMode === "create" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
                 >
-                  {isStaffSubmitting ? "Saving..." : "Save Staff"}
+                  Add New
                 </button>
               </div>
-            </form>
+
+              {viewMode === "list" ? (
+                <ul className="space-y-2">
+                  {staffTypes.map((type) => (
+                    <li
+                      key={type.id}
+                      className="flex justify-between items-center p-3 border rounded-lg"
+                    >
+                      <span>{type.name}</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEditStaffType(type)}
+                          className="text-blue-600 text-sm"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => deleteStaffType(type.id)}
+                          className="text-red-500 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <form onSubmit={handleStaffSubmit(onSubmitStaff)}>
+                  <div className="px-6 py-5 grid grid-cols-1 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">
+                        Staff Type
+                      </label>
+                      <input
+                        {...registerStaff("staffTypeName", {
+                          required: "Staff Type is required",
+                        })}
+                        placeholder="Enter staff type (e.g. Admin, Academic, ICT)"
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg"
+                      />
+                      {staffErrors.staffTypeName && (
+                        <p className="text-sm text-red-500">
+                          {staffErrors.staffTypeName.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">
+                        Campus
+                      </label>
+                      <select
+                        {...registerStaff("campusId", {
+                          required: "Campus is required",
+                        })}
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
+                      >
+                        <option value="">Select campus</option>
+                        {campuses.map((campus) => (
+                          <option key={campus.id} value={campus.id}>
+                            {campus.name} ({campus.code})
+                          </option>
+                        ))}
+                      </select>
+                      {staffErrors.campusId && (
+                        <p className="text-sm text-red-500">
+                          {staffErrors.campusId.message}
+                        </p>
+                      )}
+
+                      {campuses.length === 0 && (
+                        <p className="text-sm text-amber-600">
+                          Please create a campus first before registering staff.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={closeStaffModal}
+                      className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={isStaffSubmitting || campuses.length === 0}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {isStaffSubmitting ? "Saving..." : "Save Staff"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {editStaffType && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+                  <div className="bg-white p-6 rounded-lg w-[400px]">
+                    <h2 className="text-lg font-bold mb-4">Edit Staff Type</h2>
+
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full border p-2 rounded mb-4"
+                      placeholder="Staff type name"
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={closeEditStaffType}
+                        className="px-3 py-1 border rounded"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        onClick={updateStaffType}
+                        className="px-3 py-1 bg-blue-600 text-white rounded"
+                      >
+                        Update
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

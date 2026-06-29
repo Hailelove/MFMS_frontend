@@ -12,7 +12,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/AuthContext";
 
 // Layouts
-import PublicLayout from "./layouts/PublicLayout";
+// import PublicLayout from "./layouts/PublicLayout";
 import UserLayout from "./layouts/UserLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
@@ -41,6 +41,7 @@ import RegisterMember from "./pages/Admin/RegisterMember";
 import CampusRegistration from "./pages/Admin/CampusRegistration";
 import PayrollManager from "./pages/Admin/PayrollManager";
 import LedgerView from "./pages/Admin/LedgerView";
+import SystemConfig from "./pages/Admin/SystemConfig";
 
 const App = () => {
   return (
@@ -60,9 +61,9 @@ const App = () => {
               If already authenticated, they are redirected to their dashboard.
           ─────────────────────────────────────────────────────────────────── */}
           <Route element={<GuestRoute />}>
-            <Route element={<PublicLayout />}>
-              <Route path="/login" element={<Login />} />
-            </Route>
+            {/* <Route element={<PublicLayout />}> */}
+            <Route path="/login" element={<Login />} />
+            {/* </Route> */}
           </Route>
 
           {/* Root redirect: go to login for guests, dashboard for logged-in */}
@@ -92,6 +93,7 @@ const App = () => {
               <Route path="campuses" element={<CampusRegistration />} />
               <Route path="payroll" element={<PayrollManager />} />
               <Route path="ledger" element={<LedgerView />} />
+              <Route path="system_config" element={<SystemConfig />} />
             </Route>
           </Route>
 

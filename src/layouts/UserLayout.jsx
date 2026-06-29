@@ -4,7 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import Swal from "sweetalert2";
 
 const NAV_ITEMS = [
-  { to: "/dashboard", icon: "⬡", label: "Dashboard" },
+  { to: "/dashboard", icon: "📈", label: "Dashboard" },
   { to: "/my-loans", icon: "💳", label: "My Loans" },
   { to: "/my-savings", icon: "🏦", label: "My Savings" },
   { to: "/my-attendance", icon: "📋", label: "Attendance" },
