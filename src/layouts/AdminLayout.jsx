@@ -7,9 +7,10 @@ const NAV_ITEMS = [
   { to: "/admin/dashboard", icon: "📈", label: "Dashboard" },
   { to: "/admin/campuses", icon: "🏢", label: "Campus Register" },
   { to: "/admin/register", icon: "👤", label: "Register Member" },
-  { to: "/admin/users", icon: "👥", label: "Manage Users" },
-  { to: "/admin/loans", icon: "💳", label: "Manage Loans" },
+  { to: "/admin/Member", icon: "👥", label: "Manage Member" },
   { to: "/admin/savings", icon: "🏦", label: "Manage Savings" },
+  { to: "/admin/loans", icon: "💳", label: "Manage Loans" },
+
   { to: "/admin/payroll", icon: "💰", label: "Payroll Check" },
   { to: "/admin/ledger", icon: "🧾", label: "Ledger" },
   // { to: "/admin/attendance", icon: "📋", label: "Attendance" },

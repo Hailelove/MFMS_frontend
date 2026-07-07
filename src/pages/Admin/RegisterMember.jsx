@@ -1,11 +1,12 @@
-import React, { useContext, useEffect, useState } from "react";
+// export default RegisterMember;
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 // import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../services/api";
-import { AuthContext } from "../../context/AuthContext";
+// import { AuthContext } from "../../context/AuthContext";
 import PasswordInput, {
   PasswordStrengthMeter,
 } from "../../components/PasswordInput";
@@ -23,43 +24,71 @@ const strongPasswordSchema = yup
   );
 
 const schema = yup.object().shape({
+  // Personal Info
   fullName: yup.string().required("Full name is required"),
   email: yup.string().email("Invalid email").required("Email is required"),
+  phone: yup.string().required("Phone number is required"),
   password: strongPasswordSchema,
   confirmPassword: yup
     .string()
     .required("Confirm password is required")
     .oneOf([yup.ref("password")], "Passwords must match"),
+  gender: yup.string().optional(),
+  age: yup
+    .number()
+    .transform((value) => (Number.isNaN(value) ? undefined : value))
+    .optional(),
+  maritalStatus: yup.string().required("Marital status is required"),
+  nationalId: yup.string().optional(),
+  familySize: yup
+    .number()
+    .transform((value) => (Number.isNaN(value) ? undefined : value))
+    .optional(),
+
+  // Address
+  residentialAddress: yup.string().optional(),
+  woreda: yup.string().optional(),
+  kebele: yup.string().optional(),
+
+  // Emergency Contact
+  emergencyContact: yup.string().optional(),
+  emergencyContactPhone: yup.string().optional(),
+  emergencyContactRel: yup.string().optional(),
+
+  // Employment
   employeeId: yup.string().required("Employee ID is required"),
-  phone: yup.string().required("Phone number is required"),
-
-  initialSavingAmount: yup
-    .number()
-    .typeError("Initial saving amount must be a number")
-    .min(0, "Initial saving amount cannot be negative")
-    .required("Initial saving amount is required"),
-
-  initialShareAmount: yup
-    .number()
-    .typeError("Initial share amount must be a number")
-    .min(0, "Initial share amount cannot be negative")
-    .required("Initial share amount is required"),
-
   campusId: yup
     .number()
     .typeError("Campus is required")
     .required("Campus is required"),
-  department: yup.string().required("Department is required"),
-  officeUnit: yup.string().optional(),
-  position: yup.string().optional(),
+  staffTypeId: yup
+    .number()
+    .typeError("Staff type is required")
+    .required("Staff type is required"),
+  employmentType: yup.string().optional(),
+  governmentOfficeName: yup.string().optional(),
   monthlySalary: yup
     .number()
     .typeError("Monthly salary must be a number")
     .required("Monthly salary is required"),
-  staffId: yup
+  dateOfEmployment: yup.date().optional(),
+
+  // Financial
+  initialSavingAmount: yup
     .number()
-    .typeError("Staff type is required")
-    .required("Staff type is required"),
+    .typeError("Initial saving amount must be a number")
+    .min(0, "Cannot be negative")
+    .required("Initial saving amount is required"),
+  initialShareAmount: yup
+    .number()
+    .typeError("Initial share amount must be a number")
+    .min(0, "Cannot be negative")
+    .required("Initial share amount is required"),
+  initialShareQuantity: yup
+    .number()
+    .transform((value) => (Number.isNaN(value) ? undefined : value))
+    .min(0, "Cannot be negative")
+    .optional(),
 });
 
 const requiredBulkHeaders = [
@@ -69,16 +98,29 @@ const requiredBulkHeaders = [
   "employeeId",
   "phone",
   "campusId",
-  "staffType",
-  "department",
+  "staffTypeId",
   "monthlySalary",
   "initialSavingAmount",
   "initialShareAmount",
-  "officeUnit",
-  "position",
+  "maritalStatus",
 ];
 
-// const optionalBulkHeaders = ["officeUnit", "position"];
+const optionalBulkHeaders = [
+  "gender",
+  "age",
+  "nationalId",
+  "familySize",
+  "residentialAddress",
+  "woreda",
+  "kebele",
+  "emergencyContact",
+  "emergencyContactPhone",
+  "emergencyContactRel",
+  "employmentType",
+  "governmentOfficeName",
+  "dateOfEmployment",
+  "initialShareQuantity",
+];
 
 const parseCsvLine = (line) => {
   const values = [];
@@ -107,19 +149,6 @@ const parseCsvLine = (line) => {
 };
 
 const parseCsv = (text) => {
-  const requiredHeaders = [
-    "fullName",
-    "email",
-    "password",
-    "employeeId",
-    "phone",
-    "campusId",
-    "department",
-    "monthlySalary",
-    "initialSavingAmount",
-    "initialShareAmount",
-  ];
-
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -132,7 +161,7 @@ const parseCsv = (text) => {
   }
 
   const headers = parseCsvLine(lines[0]);
-  const missingHeaders = requiredHeaders.filter(
+  const missingHeaders = requiredBulkHeaders.filter(
     (header) => !headers.includes(header),
   );
 
@@ -148,7 +177,7 @@ const parseCsv = (text) => {
       row[header] = values[headerIndex]?.trim() || "";
     });
 
-    requiredHeaders.forEach((header) => {
+    requiredBulkHeaders.forEach((header) => {
       if (!row[header]) {
         throw new Error(`Row ${index + 2}: ${header} is required.`);
       }
@@ -159,10 +188,36 @@ const parseCsv = (text) => {
 };
 
 const downloadTemplate = () => {
-  const sampleRows = [
-    requiredBulkHeaders.join(","),
-    "John Doe,john@example.com,Password@123,EMP-001,+251900000000,1,academic,Software Engineering,15000,500,1000,ICT Office,Lecturer",
+  const allHeaders = [...requiredBulkHeaders, ...optionalBulkHeaders];
+  const sampleData = [
+    "Demeke",
+    "deme@example.com",
+    "Password@123",
+    "EMP-001",
+    "+251900000000",
+    "1",
+    "1",
+    "15000",
+    "500",
+    "1000",
+    "SINGLE",
+    "MALE",
+    "35",
+    "NID-123",
+    "4",
+    "Addis Ababa",
+    "Woreda 1",
+    "Kebele 2",
+    "Jane Doe",
+    "+251911111111",
+    "Wife",
+    "PERMANENT",
+    "Ministry of Education",
+    "2020-01-01",
+    "1",
   ];
+
+  const sampleRows = [allHeaders.join(","), sampleData.join(",")];
 
   const blob = new Blob([sampleRows.join("\n")], {
     type: "text/csv;charset=utf-8;",
@@ -184,14 +239,34 @@ const buildPayload = (data) => ({
   password: data.password,
   employeeId: data.employeeId?.trim(),
   phone: data.phone?.trim(),
+  gender: data.gender?.trim() || undefined,
+  age: data.age ? Number(data.age) : undefined,
+  maritalStatus: data.maritalStatus?.trim(),
+  nationalId: data.nationalId?.trim() || undefined,
+  familySize: data.familySize ? Number(data.familySize) : undefined,
+
+  residentialAddress: data.residentialAddress?.trim() || undefined,
+  woreda: data.woreda?.trim() || undefined,
+  kebele: data.kebele?.trim() || undefined,
+
+  emergencyContact: data.emergencyContact?.trim() || undefined,
+  emergencyContactPhone: data.emergencyContactPhone?.trim() || undefined,
+  emergencyContactRel: data.emergencyContactRel?.trim() || undefined,
+
   campusId: Number(data.campusId),
-  staffId: Number(data.staffId),
-  department: data.department?.trim(),
-  officeUnit: data.officeUnit?.trim() || undefined,
-  position: data.position?.trim() || undefined,
+  staffTypeId: Number(data.staffTypeId),
+  employmentType: data.employmentType?.trim() || undefined,
+  governmentOfficeName: data.governmentOfficeName?.trim() || undefined,
   monthlySalary: Number(data.monthlySalary),
+  dateOfEmployment: data.dateOfEmployment
+    ? new Date(data.dateOfEmployment)
+    : undefined,
+
   initialSavingAmount: Number(data.initialSavingAmount),
   initialShareAmount: Number(data.initialShareAmount),
+  initialShareQuantity: data.initialShareQuantity
+    ? Number(data.initialShareQuantity)
+    : undefined,
 });
 
 const RegisterMember = () => {
@@ -211,7 +286,8 @@ const RegisterMember = () => {
     (campus) => Number(campus.id) === Number(selectedCampusId),
   );
 
-  const staffOptions = selectedCampus?.staff || [];
+  const staffOptions =
+    selectedCampus?.campusStaffTypes?.map((cst) => cst.staffType) || [];
 
   useEffect(() => {
     const fetchCampuses = async () => {
@@ -219,7 +295,7 @@ const RegisterMember = () => {
         const res = await api.get("/campuses");
         setCampuses(res.data || []);
       } catch (err) {
-        toast.error("Could not load campuses", err);
+        toast.error("Could not load campuses", err.message || "");
       }
     };
 
@@ -227,7 +303,7 @@ const RegisterMember = () => {
   }, []);
 
   useEffect(() => {
-    setValue("staffId", "");
+    setValue("staffTypeId", "");
   }, [selectedCampusId, setValue]);
 
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -237,26 +313,24 @@ const RegisterMember = () => {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
 
-  const { login } = useContext(AuthContext);
-  // const navigate = useNavigate();
-
   const watchedPassword = watch("password", "");
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
 
     try {
-      const response = await api.post(
-        "/users/register-member",
-        buildPayload(data),
-      );
-      const { token, ...userData } = response.data;
-
-      login(userData, token);
+      await api.post("/users/register-member", buildPayload(data), {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
       toast.success("Account created successfully. Welcome!");
-      // navigate("/dashboard", { replace: true });
       reset();
     } catch (error) {
+      console.error(
+        "Registration Error:",
+        error.response?.data || error.message,
+      );
       toast.error(
         error.response?.data?.message ||
           "Registration failed. Please try again.",
@@ -293,6 +367,7 @@ const RegisterMember = () => {
       event.target.value = "";
     }
   };
+
   const handleBulkImport = async () => {
     if (bulkRows.length === 0) {
       toast.error("Please choose a CSV file first.");
@@ -307,7 +382,11 @@ const RegisterMember = () => {
 
     for (const [index, row] of bulkRows.entries()) {
       try {
-        await api.post("/users/register-member", buildPayload(row));
+        await api.post("/users/register-member", buildPayload(row), {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
         successCount += 1;
       } catch (error) {
         failed.push({
@@ -333,9 +412,37 @@ const RegisterMember = () => {
     setBulkImporting(false);
   };
 
+  // Helper component for standard input fields
+  const InputField = ({
+    label,
+    id,
+    type = "text",
+    placeholder,
+    registerName,
+    error,
+    min,
+    step,
+  }) => (
+    <div className="flex flex-col space-y-1.5">
+      <label className="text-sm font-medium text-slate-700" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        min={min}
+        step={step}
+        className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
+        placeholder={placeholder}
+        {...registerForm(registerName)}
+      />
+      {error && <p className="text-sm text-red-500">{error.message}</p>}
+    </div>
+  );
+
   return (
-    <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-      <div className="mb-8 flex items-center justify-between gap-4">
+    <div className="max-w-6xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
+      <div className="mb-8 flex items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-slate-800">
           Member Registration
         </h2>
@@ -348,316 +455,387 @@ const RegisterMember = () => {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-full-name"
-            >
-              Full Name
-            </label>
-            <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-8">
+        {/* SECTION: Personal Info */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
+            Personal Information
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            <InputField
+              label="Full Name"
               id="reg-full-name"
-              type="text"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
               placeholder="John Doe"
-              autoComplete="name"
-              {...registerForm("fullName")}
+              registerName="fullName"
+              error={errors.fullName}
             />
-            {errors.fullName && (
-              <p className="text-sm text-red-500">{errors.fullName.message}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-email"
-            >
-              Email Address
-            </label>
-            <input
+            <InputField
+              label="Email Address"
               id="reg-email"
               type="email"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
               placeholder="you@example.com"
-              autoComplete="email"
-              {...registerForm("email")}
+              registerName="email"
+              error={errors.email}
             />
-            {errors.email && (
-              <p className="text-sm text-red-500">{errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-password"
-            >
-              Password
-            </label>
-            <PasswordInput
-              id="reg-password"
-              placeholder="Create a strong password"
-              autoComplete="new-password"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              {...registerForm("password")}
-            />
-            {errors.password && (
-              <p className="text-sm text-red-500">{errors.password.message}</p>
-            )}
-            <PasswordStrengthMeter password={watchedPassword} />
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-confirm"
-            >
-              Confirm Password
-            </label>
-            <PasswordInput
-              id="reg-confirm"
-              placeholder="Repeat your password"
-              autoComplete="new-password"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              {...registerForm("confirmPassword")}
-            />
-            {errors.confirmPassword && (
-              <p className="text-sm text-red-500">
-                {errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-employee-id"
-            >
-              Employee ID
-            </label>
-            <input
-              id="reg-employee-id"
-              type="text"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              placeholder="EMP-001"
-              {...registerForm("employeeId")}
-            />
-            {errors.employeeId && (
-              <p className="text-sm text-red-500">
-                {errors.employeeId.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-phone"
-            >
-              Phone
-            </label>
-            <input
+            <InputField
+              label="Phone"
               id="reg-phone"
               type="tel"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
               placeholder="+251900000000"
-              {...registerForm("phone")}
+              registerName="phone"
+              error={errors.phone}
             />
-            {errors.phone && (
-              <p className="text-sm text-red-500">{errors.phone.message}</p>
-            )}
-          </div>
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-campus"
-            >
-              Select Campus
-            </label>
-            <select
-              id="reg-campus"
-              {...registerForm("campusId")}
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-            >
-              <option value="">-- Choose a Campus --</option>
 
-              {campuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name} ({campus.code})
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-gender"
+              >
+                Gender
+              </label>
+              <select
+                id="reg-gender"
+                className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                {...registerForm("gender")}
+              >
+                <option value="">Select Gender</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </select>
+            </div>
+
+            <InputField
+              label="Age"
+              id="reg-age"
+              type="number"
+              placeholder="30"
+              registerName="age"
+              error={errors.age}
+            />
+
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-marital"
+              >
+                Marital Status
+              </label>
+              <select
+                id="reg-marital"
+                className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                {...registerForm("maritalStatus")}
+              >
+                <option value="" disabled>
+                  Select Marital Status
                 </option>
-              ))}
-            </select>
+                <option value="SINGLE">SINGLE</option>
+                <option value="MARRIED">MARRIED</option>
+                <option value="DIVORCED">DIVORCED</option>
+                <option value="WIDOWED">WIDOWED</option>
+              </select>
+              {errors.maritalStatus && (
+                <p className="text-red-500 text-sm">
+                  {errors.maritalStatus.message}
+                </p>
+              )}
+            </div>
 
-            {errors.campusId && (
-              <p className="text-sm text-red-500">{errors.campusId.message}</p>
-            )}
+            <InputField
+              label="National ID"
+              id="reg-national-id"
+              placeholder="NID-12345"
+              registerName="nationalId"
+              error={errors.nationalId}
+            />
+            <InputField
+              label="Family Size"
+              id="reg-family-size"
+              type="number"
+              placeholder="4"
+              registerName="familySize"
+              error={errors.familySize}
+            />
           </div>
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-staff-type"
-            >
-              Staff Type
-            </label>
+        </section>
 
-            <select
-              id="reg-staff-type"
-              {...registerForm("staffId")}
-              disabled={!selectedCampusId || staffOptions.length === 0}
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-            >
-              <option value="">
-                {!selectedCampusId
-                  ? "-- Select campus first --"
-                  : staffOptions.length === 0
-                    ? "-- No staff found for this campus --"
-                    : "-- Choose staff type --"}
-              </option>
+        {/* SECTION: Security */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
+            {" "}
+            {/* border-b pb-2 */}
+            Security
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-password"
+              >
+                Password
+              </label>
+              <PasswordInput
+                id="reg-password"
+                placeholder="Create a strong password"
+                autoComplete="new-password"
+                {...registerForm("password")}
+              />
+              {errors.password && (
+                <p className="text-sm text-red-500">
+                  {errors.password.message}
+                </p>
+              )}
+              <PasswordStrengthMeter password={watchedPassword} />
+            </div>
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-confirm"
+              >
+                Confirm Password
+              </label>
+              <PasswordInput
+                id="reg-confirm"
+                placeholder="Repeat your password"
+                autoComplete="new-password"
+                {...registerForm("confirmPassword")}
+              />
+              {errors.confirmPassword && (
+                <p className="text-sm text-red-500">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
 
-              {staffOptions.map((staff) => (
-                <option key={staff.id} value={staff.id}>
-                  {staff.role === "ADMIN" ? "Admin Staff" : "Academic Staff"} -{" "}
-                  {staff.fullName}
+        {/* SECTION: Address Details */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
+            Address Details
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            <InputField
+              label="Residential Address"
+              id="reg-res-address"
+              placeholder="Addis Ababa"
+              registerName="residentialAddress"
+              error={errors.residentialAddress}
+            />
+            <InputField
+              label="Woreda"
+              id="reg-woreda"
+              placeholder="Woreda 01"
+              registerName="woreda"
+              error={errors.woreda}
+            />
+            <InputField
+              label="Kebele"
+              id="reg-kebele"
+              placeholder="Kebele 02"
+              registerName="kebele"
+              error={errors.kebele}
+            />
+          </div>
+        </section>
+
+        {/* SECTION: Emergency Contact */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
+            Emergency Contact (Next of Kin)
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            <InputField
+              label="Contact Name"
+              id="reg-emer-name"
+              placeholder="Jane Doe"
+              registerName="emergencyContact"
+              error={errors.emergencyContact}
+            />
+            <InputField
+              label="Contact Phone"
+              id="reg-emer-phone"
+              type="tel"
+              placeholder="+251911111111"
+              registerName="emergencyContactPhone"
+              error={errors.emergencyContactPhone}
+            />
+            <InputField
+              label="Relationship"
+              id="reg-emer-rel"
+              placeholder="Wife / Brother"
+              registerName="emergencyContactRel"
+              error={errors.emergencyContactRel}
+            />
+          </div>
+        </section>
+
+        {/* SECTION: Employment */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
+            Employment Information
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            <InputField
+              label="Employee ID"
+              id="reg-employee-id"
+              placeholder="EMP-001"
+              registerName="employeeId"
+              error={errors.employeeId}
+            />
+
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-campus"
+              >
+                Select Campus
+              </label>
+              <select
+                id="reg-campus"
+                {...registerForm("campusId")}
+                className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+              >
+                <option value="">-- Choose a Campus --</option>
+                {campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name} ({campus.code})
+                  </option>
+                ))}
+              </select>
+              {errors.campusId && (
+                <p className="text-sm text-red-500">
+                  {errors.campusId.message}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-staff-type"
+              >
+                Staff Type
+              </label>
+              <select
+                id="reg-staff-type"
+                {...registerForm("staffTypeId", {
+                  required: "Staff type is required",
+                })}
+                disabled={!selectedCampusId || staffOptions.length === 0}
+                className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none disabled:bg-slate-100 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {!selectedCampusId
+                    ? "-- Select campus first --"
+                    : staffOptions.length === 0
+                      ? "-- No staff types --"
+                      : "-- Choose staff type --"}
                 </option>
-              ))}
-            </select>
+                {staffOptions.map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staff.name}
+                  </option>
+                ))}
+              </select>
+              {errors.staffTypeId && (
+                <p className="text-sm text-red-500">
+                  {errors.staffTypeId.message}
+                </p>
+              )}
+            </div>
 
-            {errors.staffId && (
-              <p className="text-sm text-red-500">{errors.staffId.message}</p>
-            )}
-          </div>
+            <div className="flex flex-col space-y-1.5">
+              <label
+                className="text-sm font-medium text-slate-700"
+                htmlFor="reg-emp-type"
+              >
+                Employment Type
+              </label>
+              <select
+                id="reg-emp-type"
+                className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                {...registerForm("employmentType")}
+              >
+                <option value="">Select Type</option>
+                <option value="PERMANENT">PERMANENT</option>
+                <option value="CONTRACT">CONTRACT</option>
+                <option value="TEMPORARY">TEMPORARY</option>
+              </select>
+            </div>
 
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-department"
-            >
-              Department
-            </label>
-            <input
-              id="reg-department"
-              type="text"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              placeholder="Software Engineering"
-              {...registerForm("department")}
+            <InputField
+              label="Gov Office Name (If applicable)"
+              id="reg-gov-office"
+              placeholder="Ministry of Education"
+              registerName="governmentOfficeName"
+              error={errors.governmentOfficeName}
             />
-            {errors.department && (
-              <p className="text-sm text-red-500">
-                {errors.department.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-office"
-            >
-              Office Unit
-            </label>
-            <input
-              id="reg-office"
-              type="text"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              placeholder="ICT Office"
-              {...registerForm("officeUnit")}
+            <InputField
+              label="Date of Employment"
+              id="reg-date-emp"
+              type="date"
+              registerName="dateOfEmployment"
+              error={errors.dateOfEmployment}
             />
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-position"
-            >
-              Position
-            </label>
-            <input
-              id="reg-position"
-              type="text"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              placeholder="Lecturer"
-              {...registerForm("position")}
+            <InputField
+              label="Monthly Salary"
+              id="reg-salary"
+              type="number"
+              placeholder="15000"
+              registerName="monthlySalary"
+              error={errors.monthlySalary}
             />
           </div>
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-initial-saving"
-            >
-              Initial Saving Amount
-            </label>
-            <input
+        </section>
+
+        {/* SECTION: Initial Financials */}
+        <section>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">
+            Initial Financials
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            <InputField
+              label="Initial Saving Amount"
               id="reg-initial-saving"
               type="number"
               min="0"
               step="0.01"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
               placeholder="500"
-              {...registerForm("initialSavingAmount")}
+              registerName="initialSavingAmount"
+              error={errors.initialSavingAmount}
             />
-            {errors.initialSavingAmount && (
-              <p className="text-sm text-red-500">
-                {errors.initialSavingAmount.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-initial-share"
-            >
-              Initial Share Amount
-            </label>
-            <input
+            <InputField
+              label="Initial Share Amount"
               id="reg-initial-share"
               type="number"
               min="0"
               step="0.01"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
               placeholder="1000"
-              {...registerForm("initialShareAmount")}
+              registerName="initialShareAmount"
+              error={errors.initialShareAmount}
             />
-            {errors.initialShareAmount && (
-              <p className="text-sm text-red-500">
-                {errors.initialShareAmount.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="reg-salary"
-            >
-              Monthly Salary
-            </label>
-            <input
-              id="reg-salary"
+            <InputField
+              label="Initial Share Quantity"
+              id="reg-initial-share-qty"
               type="number"
-              className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
-              placeholder="15000"
-              {...registerForm("monthlySalary")}
+              min="0"
+              placeholder="1"
+              registerName="initialShareQuantity"
+              error={errors.initialShareQuantity}
             />
-            {errors.monthlySalary && (
-              <p className="text-sm text-red-500">
-                {errors.monthlySalary.message}
-              </p>
-            )}
           </div>
-        </div>
+        </section>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full mt-6 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed text-lg"
         >
-          {isSubmitting ? "Creating account..." : "Create Account"}
+          {isSubmitting ? "Creating account..." : "Register Member"}
         </button>
       </form>
+
+      {/* Bulk Import Modal */}
       {showBulkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200">
@@ -665,39 +843,32 @@ const RegisterMember = () => {
               <h3 className="text-xl font-bold text-slate-800">
                 Bulk Import Members
               </h3>
-
               <button
                 type="button"
                 onClick={() => setShowBulkModal(false)}
                 className="text-slate-500 hover:text-slate-900 text-2xl leading-none"
               >
-                ×
+                &times;
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
               <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
                 <h4 className="font-semibold text-slate-800 mb-2">
                   Requirements
                 </h4>
-
                 <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
                   <li>File type must be CSV.</li>
                   <li>First row must contain the correct column headers.</li>
                   <li>
-                    Required columns: fullName, email, password, employeeId,
-                    phone, campusId, department, monthlySalary,
-                    initialSavingAmount, initialShareAmount.
-                  </li>
-                  <li>Optional columns: officeUnit, position.</li>
-                  <li>
-                    Password must follow the same strong password rule as single
-                    registration.
+                    <strong>Required columns:</strong>{" "}
+                    {requiredBulkHeaders.join(", ")}
                   </li>
                   <li>
-                    Each row will be submitted to the existing registration
-                    endpoint one by one.
+                    <strong>Optional columns:</strong>{" "}
+                    {optionalBulkHeaders.join(", ")}
                   </li>
+                  <li>Passwords must follow the strong password rules.</li>
                 </ul>
               </div>
 
@@ -718,7 +889,6 @@ const RegisterMember = () => {
                 >
                   Choose CSV File
                 </label>
-
                 <input
                   id="bulk-file"
                   type="file"
@@ -726,7 +896,6 @@ const RegisterMember = () => {
                   onChange={handleBulkFileChange}
                   className="w-full px-4 py-2.5 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none shadow-sm"
                 />
-
                 {bulkFileName && (
                   <p className="text-sm text-slate-600">
                     Selected: {bulkFileName} ({bulkRows.length} row(s))
@@ -739,11 +908,9 @@ const RegisterMember = () => {
                   <p className="font-semibold text-slate-800">
                     Imported: {bulkResult.successCount}
                   </p>
-
                   <p className="font-semibold text-slate-800">
                     Failed: {bulkResult.failed.length}
                   </p>
-
                   {bulkResult.failed.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {bulkResult.failed.map((item) => (
@@ -768,7 +935,6 @@ const RegisterMember = () => {
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 onClick={handleBulkImport}

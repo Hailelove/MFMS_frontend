@@ -32,7 +32,7 @@ import MyAttendance from "./pages/User/MyAttendance";
 
 // Pages - Admin
 import AdminDashboard from "./pages/Admin/Dashboard";
-import ManageUsers from "./pages/Admin/ManageUsers";
+import ManageMember from "./pages/Admin/ManageMember";
 import ManageLoans from "./pages/Admin/ManageLoans";
 import ManageSavings from "./pages/Admin/ManageSavings";
 // import ManageAttendance from "./pages/Admin/ManageAttendance";
@@ -85,7 +85,7 @@ const App = () => {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="register" element={<RegisterMember />} />
-              <Route path="users" element={<ManageUsers />} />
+              <Route path="member" element={<ManageMember />} />
               <Route path="loans" element={<ManageLoans />} />
               <Route path="savings" element={<ManageSavings />} />
               {/* <Route path="attendance" element={<ManageAttendance />} /> */}
