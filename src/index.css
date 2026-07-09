@@ -1,2 +1,25 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand: #3b82f6;
+  --spacing-custom: 1.25rem;
+}
+
 @variant dark (&:where(.dark, .dark *));
+
+/* 1. Force the background on the absolute root */
+html {
+  @apply bg-white dark:bg-slate-950;
+}
+
+/* 2. Ensure body inherits and fills the screen */
+body {
+  @apply m-0 min-h-screen text-slate-900 dark:text-slate-50 transition-colors duration-300;
+  /* Remove the background here so the 'html' tag takes control */
+}
+
+/* 3. Global Reset for common containers that might block the color */
+/* If you have a main wrapper, add it here */
+#root {
+  @apply min-h-screen flex flex-col;
+}

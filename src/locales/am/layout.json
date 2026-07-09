@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "Dashboard": "ዳሽቦርድ",
+    "Campus Register": "ካምፓስ መመዝገቢያ",
+    "Register Member": "አባል መመዝገቢያ",
+    "Manage Member": "አባላት አስተዳደር",
+    "Manage Savings": "ቁጠባ አስተዳደር",
+    "Manage Loans": "ብድር አስተዳደር",
+    "Payroll Check": "ደመወዝ ማረጋገጫ",
+    "Ledger": "መዝገብ",
+    "Reports": "ሪፖርቶች",
+    "System Config": "ስርዓት ቅንብር",
+
+    "My Loans": "የእኔ ብድሮች",
+    "My Savings": "የእኔ ቁጠባ",
+    "Attendance": "አቴንዳንስ"
+  }
+}

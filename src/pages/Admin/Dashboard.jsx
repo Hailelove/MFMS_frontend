@@ -124,7 +124,11 @@ const AdminDashboard = () => {
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { to: "/admin/users", label: "Manage Users", color: "bg-blue-600" },
+            {
+              to: "/admin/member",
+              label: "Manage Member",
+              color: "bg-blue-600",
+            },
             {
               to: "/admin/loans",
               label: "Loan Management",

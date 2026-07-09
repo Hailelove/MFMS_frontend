@@ -10,6 +10,7 @@ import api from "../../services/api";
 import PasswordInput, {
   PasswordStrengthMeter,
 } from "../../components/PasswordInput";
+import { useTranslation } from "react-i18next";
 
 const strongPasswordSchema = yup
   .string()
@@ -270,6 +271,7 @@ const buildPayload = (data) => ({
 });
 
 const RegisterMember = () => {
+  const { t } = useTranslation("member", "common");
   const {
     register: registerForm,
     handleSubmit,
@@ -444,14 +446,14 @@ const RegisterMember = () => {
     <div className="max-w-6xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
       <div className="mb-8 flex items-center justify-between gap-4 border-b pb-4">
         <h2 className="text-2xl font-bold text-slate-800">
-          Member Registration
+          {t("Member Registration")}
         </h2>
         <button
           type="button"
           onClick={() => setShowBulkModal(true)}
           className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
         >
-          Bulk Import
+          {t("Bulk Import")}
         </button>
       </div>
 
@@ -459,18 +461,18 @@ const RegisterMember = () => {
         {/* SECTION: Personal Info */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
-            Personal Information
+            {t("Personal Information", { ns: "member" })}
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             <InputField
-              label="Full Name"
+              label={t("Full Name")}
               id="reg-full-name"
               placeholder="John Doe"
               registerName="fullName"
               error={errors.fullName}
             />
             <InputField
-              label="Email Address"
+              label={t("Email Address")}
               id="reg-email"
               type="email"
               placeholder="you@example.com"
@@ -478,7 +480,7 @@ const RegisterMember = () => {
               error={errors.email}
             />
             <InputField
-              label="Phone"
+              label={t("Phone")}
               id="reg-phone"
               type="tel"
               placeholder="+251900000000"
@@ -491,7 +493,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-gender"
               >
-                Gender
+                {t("Gender")}
               </label>
               <select
                 id="reg-gender"
@@ -505,7 +507,7 @@ const RegisterMember = () => {
             </div>
 
             <InputField
-              label="Age"
+              label={t("Age")}
               id="reg-age"
               type="number"
               placeholder="30"
@@ -518,7 +520,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-marital"
               >
-                Marital Status
+                {t("Marital Status")}
               </label>
               <select
                 id="reg-marital"
@@ -541,14 +543,14 @@ const RegisterMember = () => {
             </div>
 
             <InputField
-              label="National ID"
+              label={t("National ID")}
               id="reg-national-id"
               placeholder="NID-12345"
               registerName="nationalId"
               error={errors.nationalId}
             />
             <InputField
-              label="Family Size"
+              label={t("Family Size")}
               id="reg-family-size"
               type="number"
               placeholder="4"
@@ -563,7 +565,7 @@ const RegisterMember = () => {
           <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
             {" "}
             {/* border-b pb-2 */}
-            Security
+            {t("Security")}
           </h3>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex flex-col space-y-1.5">
@@ -571,7 +573,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-password"
               >
-                Password
+                {t("Password")}
               </label>
               <PasswordInput
                 id="reg-password"
@@ -591,7 +593,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-confirm"
               >
-                Confirm Password
+                {t("Confirm Password")}
               </label>
               <PasswordInput
                 id="reg-confirm"
@@ -611,25 +613,25 @@ const RegisterMember = () => {
         {/* SECTION: Address Details */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
-            Address Details
+            {t("Address Details")}
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             <InputField
-              label="Residential Address"
+              label={t("Residential Address")}
               id="reg-res-address"
               placeholder="Addis Ababa"
               registerName="residentialAddress"
               error={errors.residentialAddress}
             />
             <InputField
-              label="Woreda"
+              label={t("Woreda")}
               id="reg-woreda"
               placeholder="Woreda 01"
               registerName="woreda"
               error={errors.woreda}
             />
             <InputField
-              label="Kebele"
+              label={t("Kebele")}
               id="reg-kebele"
               placeholder="Kebele 02"
               registerName="kebele"
@@ -641,18 +643,18 @@ const RegisterMember = () => {
         {/* SECTION: Emergency Contact */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
-            Emergency Contact (Next of Kin)
+            {t("Emergency Contact ")}(Next of Kin)
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             <InputField
-              label="Contact Name"
+              label={t("Contact Name")}
               id="reg-emer-name"
               placeholder="Jane Doe"
               registerName="emergencyContact"
               error={errors.emergencyContact}
             />
             <InputField
-              label="Contact Phone"
+              label={t("Contact Phone")}
               id="reg-emer-phone"
               type="tel"
               placeholder="+251911111111"
@@ -660,7 +662,7 @@ const RegisterMember = () => {
               error={errors.emergencyContactPhone}
             />
             <InputField
-              label="Relationship"
+              label={t("Relationship")}
               id="reg-emer-rel"
               placeholder="Wife / Brother"
               registerName="emergencyContactRel"
@@ -672,11 +674,11 @@ const RegisterMember = () => {
         {/* SECTION: Employment */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4 ">
-            Employment Information
+            {t("Employment Information")}
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             <InputField
-              label="Employee ID"
+              label={t("Employee ID")}
               id="reg-employee-id"
               placeholder="EMP-001"
               registerName="employeeId"
@@ -688,7 +690,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-campus"
               >
-                Select Campus
+                {t("Select Campus")}
               </label>
               <select
                 id="reg-campus"
@@ -714,7 +716,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-staff-type"
               >
-                Staff Type
+                {t("Staff Type")}
               </label>
               <select
                 id="reg-staff-type"
@@ -749,7 +751,7 @@ const RegisterMember = () => {
                 className="text-sm font-medium text-slate-700"
                 htmlFor="reg-emp-type"
               >
-                Employment Type
+                {t("Employment Type")}
               </label>
               <select
                 id="reg-emp-type"
@@ -764,21 +766,21 @@ const RegisterMember = () => {
             </div>
 
             <InputField
-              label="Gov Office Name (If applicable)"
+              label={t("Government Office Name")}
               id="reg-gov-office"
               placeholder="Ministry of Education"
               registerName="governmentOfficeName"
               error={errors.governmentOfficeName}
             />
             <InputField
-              label="Date of Employment"
+              label={t("Date of Employment")}
               id="reg-date-emp"
               type="date"
               registerName="dateOfEmployment"
               error={errors.dateOfEmployment}
             />
             <InputField
-              label="Monthly Salary"
+              label={t("Monthly Salary")}
               id="reg-salary"
               type="number"
               placeholder="15000"
@@ -791,11 +793,11 @@ const RegisterMember = () => {
         {/* SECTION: Initial Financials */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            Initial Financials
+            {t("Initial Financials")}
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
             <InputField
-              label="Initial Saving Amount"
+              label={t("Initial Saving Amount")}
               id="reg-initial-saving"
               type="number"
               min="0"
@@ -805,7 +807,7 @@ const RegisterMember = () => {
               error={errors.initialSavingAmount}
             />
             <InputField
-              label="Initial Share Amount"
+              label={t("Initial Share Amount")}
               id="reg-initial-share"
               type="number"
               min="0"
@@ -815,7 +817,7 @@ const RegisterMember = () => {
               error={errors.initialShareAmount}
             />
             <InputField
-              label="Initial Share Quantity"
+              label={t("Initial Share Quantity")}
               id="reg-initial-share-qty"
               type="number"
               min="0"
@@ -831,7 +833,8 @@ const RegisterMember = () => {
           disabled={isSubmitting}
           className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed text-lg"
         >
-          {isSubmitting ? "Creating account..." : "Register Member"}
+          {/* {isSubmitting ? "Creating account..." : "Register Member"} */}
+          {isSubmitting ? t("Creating Account...") : t("Register Member")}
         </button>
       </form>
 
@@ -841,7 +844,7 @@ const RegisterMember = () => {
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
               <h3 className="text-xl font-bold text-slate-800">
-                Bulk Import Members
+                {t("Bulk Import Members")}
               </h3>
               <button
                 type="button"
@@ -855,20 +858,24 @@ const RegisterMember = () => {
             <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
               <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
                 <h4 className="font-semibold text-slate-800 mb-2">
-                  Requirements
+                  {t("Requirements")}
                 </h4>
                 <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
-                  <li>File type must be CSV.</li>
-                  <li>First row must contain the correct column headers.</li>
+                  <li>{t("File type must be CSV.")}</li>
                   <li>
-                    <strong>Required columns:</strong>{" "}
+                    {t("First row must contain the correct column headers.")}
+                  </li>
+                  <li>
+                    <strong>{t("Required columns:")}</strong>{" "}
                     {requiredBulkHeaders.join(", ")}
                   </li>
                   <li>
-                    <strong>Optional columns:</strong>{" "}
+                    <strong>{t("Optional columns:")}</strong>{" "}
                     {optionalBulkHeaders.join(", ")}
                   </li>
-                  <li>Passwords must follow the strong password rules.</li>
+                  <li>
+                    {t("Passwords must follow the strong password rules.")}
+                  </li>
                 </ul>
               </div>
 
@@ -878,7 +885,7 @@ const RegisterMember = () => {
                   onClick={downloadTemplate}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
                 >
-                  Download Template
+                  {t("Download Template")}
                 </button>
               </div>
 
@@ -887,7 +894,7 @@ const RegisterMember = () => {
                   htmlFor="bulk-file"
                   className="block text-sm font-medium text-slate-700"
                 >
-                  Choose CSV File
+                  {t("Choose CSV File")}
                 </label>
                 <input
                   id="bulk-file"
@@ -933,7 +940,7 @@ const RegisterMember = () => {
                 onClick={() => setShowBulkModal(false)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="button"
@@ -941,7 +948,7 @@ const RegisterMember = () => {
                 disabled={bulkImporting || bulkRows.length === 0}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {bulkImporting ? "Importing..." : "Import Members"}
+                {bulkImporting ? t("Importing...") : t("Import Members")}
               </button>
             </div>
           </div>

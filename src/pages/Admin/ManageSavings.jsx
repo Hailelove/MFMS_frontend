@@ -1,943 +1,3 @@
-// import React, { useCallback, useEffect, useState } from "react";
-// import api from "../../services/api";
-// import { toast } from "react-toastify";
-// import moment from "moment";
-// import { useForm } from "react-hook-form";
-// import Pagination from "../../components/Pagination";
-
-// const ITEMS_PER_PAGE = 12;
-
-// const ManageSavings = () => {
-//   const [users, setUsers] = useState([]);
-//   const [savingsOverview, setSavingsOverview] = useState([]);
-//   const [loading, setLoading] = useState(true);
-
-//   const [selectedUserId, setSelectedUserId] = useState(null);
-//   const [selectedUserName, setSelectedUserName] = useState("");
-//   const [selectedUserStatus, setSelectedUserStatus] = useState("ACTIVE");
-//   const [userSavingsDetail, setUserSavingsDetail] = useState(null);
-//   const [detailLoading, setDetailLoading] = useState(false);
-
-//   // Filter state for overdue/missed contributions
-//   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
-
-//   const paymentMethodOptions = [
-//     { value: "CASH", label: "Cash" },
-//     { value: "BANK", label: "Bank Deposit" },
-//     { value: "PAYROLL", label: "Payroll Deduction" },
-//   ];
-
-//   const savingCategoryOptions = [
-//     { value: "INITIAL_SAVING", label: "Initial Saving" },
-//     { value: "MONTHLY_SAVING", label: "Monthly Saving (መደበኛ ቁጠባ)" },
-//     {
-//       value: "IRREGULAR_SAVING",
-//       label: "Additional/Irregular Saving (ኢ-መደበኛ ቁጠባ)",
-//     },
-//     { value: "CHILDREN_SAVING", label: "Children Saving (የልጆች ቁጠባ)" },
-//     { value: "ORGANIZATION_SAVING", label: "Organization Saving (የደርጅቶች ቁጠባ)" },
-//     { value: "WITHDRAWAL", label: "Withdrawal" },
-//     { value: "ADJUSTMENT", label: "Adjustment" },
-//   ];
-
-//   const getSavingType = (category) => {
-//     if (category === "WITHDRAWAL") return "WITHDRAWAL";
-//     if (category === "ADJUSTMENT") return "ADJUSTMENT";
-//     return "DEPOSIT";
-//   };
-
-//   const {
-//     register,
-//     handleSubmit,
-//     reset,
-//     watch,
-//     formState: { errors },
-//   } = useForm({
-//     defaultValues: {
-//       category: "MONTHLY_SAVING",
-//       transactionDate: moment().format("YYYY-MM-DD"),
-//       paymentMethod: "CASH",
-//       amount: "",
-//       payrollMonth: "",
-//       referenceNo: "",
-//       remarks: "",
-//     },
-//   });
-
-//   const [submitLoading, setSubmitLoading] = useState(false);
-//   const [minimumSavingAmount, setMinimumSavingAmount] = useState(0);
-
-//   const paymentMethod = watch("paymentMethod");
-//   const category = watch("category");
-
-//   // Delete modal state
-//   const [deleteModal, setDeleteModal] = useState(null);
-//   const [deleteReason, setDeleteReason] = useState("");
-//   const [deleting, setDeleting] = useState(false);
-
-//   // Pagination state
-//   const [overviewPage, setOverviewPage] = useState(1);
-//   const [historyPage, setHistoryPage] = useState(1);
-
-//   const fetchUsers = useCallback(async () => {
-//     try {
-//       const res = await api.get("/admin/users");
-//       // Handle both array and object with data property
-//       const membersList = Array.isArray(res.data)
-//         ? res.data
-//         : res.data?.data || [];
-//       setUsers(membersList);
-//     } catch (err) {
-//       console.error("Error fetching users:", err);
-//       toast.error("Failed to load members");
-//       setUsers([]);
-//     }
-//   }, []);
-
-//   const fetchSavingsOverview = useCallback(async () => {
-//     setLoading(true);
-//     try {
-//       const response = await api.get("/admin/savings");
-//       // Handle both array and object with data property
-//       const savingsList = Array.isArray(response.data)
-//         ? response.data
-//         : response.data?.data || [];
-//       setSavingsOverview(savingsList);
-//     } catch (error) {
-//       console.error("Error fetching savings overview:", error);
-//       toast.error(
-//         "Failed to load overview: " +
-//           (error.response?.data?.message || error.message),
-//       );
-//       setSavingsOverview([]);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, []);
-
-//   const fetchSettings = useCallback(async () => {
-//     try {
-//       const response = await api.get("/admin/settings/saving");
-//       setMinimumSavingAmount(response.data?.minimumSavingAmount || 100);
-//     } catch (err) {
-//       console.error("Error fetching settings:", err);
-//       setMinimumSavingAmount(100);
-//     }
-//   }, []);
-
-//   useEffect(() => {
-//     fetchSavingsOverview();
-//     fetchUsers();
-//     fetchSettings();
-//   }, [fetchSavingsOverview, fetchUsers, fetchSettings]);
-
-//   const openUserDetail = async (userId, name, status) => {
-//     if (userId === undefined || userId === null) {
-//       console.error("CRITICAL: userId is undefined!");
-//       toast.error("Cannot manage account: User ID not found.");
-//       return;
-//     }
-
-//     // Check if member is active
-//     if (status !== "ACTIVE") {
-//       toast.warning("Only active members can make saving transactions.");
-//       return;
-//     }
-
-//     setSelectedUserId(userId);
-//     setSelectedUserName(name);
-//     setSelectedUserStatus(status);
-//     setDetailLoading(true);
-//     setUserSavingsDetail(null);
-//     setHistoryPage(1);
-//     setShowOverdueOnly(false);
-
-//     try {
-//       const response = await api.get(`/admin/member-finance/${userId}`);
-//       setUserSavingsDetail(response.data);
-//     } catch (error) {
-//       console.error("Error loading financial details:", error);
-//       toast.error(
-//         "Failed to load financial details: " +
-//           (error.response?.data?.message || error.message),
-//       );
-//       setSelectedUserId(null);
-//     } finally {
-//       setDetailLoading(false);
-//     }
-//   };
-
-//   const onSubmitPayment = async (data) => {
-//     // Validate active member status
-//     if (selectedUserStatus !== "ACTIVE") {
-//       toast.error("Only active members can make saving transactions.");
-//       return;
-//     }
-
-//     // Validate minimum saving amount for monthly savings
-//     if (
-//       data.category === "MONTHLY_SAVING" &&
-//       Number(data.amount) < minimumSavingAmount
-//     ) {
-//       toast.error(
-//         `Monthly saving contributions cannot be less than ETB ${minimumSavingAmount}`,
-//       );
-//       return;
-//     }
-
-//     setSubmitLoading(true);
-
-//     try {
-//       const payload = {
-//         category: data.category,
-//         type: getSavingType(data.category),
-//         amount: Number(data.amount),
-//         transactionDate: data.transactionDate,
-//         paymentMethod: data.paymentMethod,
-//         referenceNo: data.referenceNo?.trim() || null,
-//         remarks: data.remarks?.trim() || null,
-//         isInitialTransaction: data.category === "INITIAL_SAVING",
-//       };
-
-//       if (data.paymentMethod === "PAYROLL" && data.payrollMonth) {
-//         payload.payrollMonth = `${data.payrollMonth}-01`;
-//       }
-
-//       const endpoint = `/admin/savings/${selectedUserId}/transaction`;
-
-//       await api.post(endpoint, payload);
-
-//       toast.success("Saving transaction recorded successfully");
-
-//       // Reset form
-//       reset({
-//         category: "MONTHLY_SAVING",
-//         transactionDate: moment().format("YYYY-MM-DD"),
-//         paymentMethod: "CASH",
-//         amount: "",
-//         payrollMonth: "",
-//         referenceNo: "",
-//         remarks: "",
-//       });
-
-//       // Refresh data
-//       await openUserDetail(
-//         selectedUserId,
-//         selectedUserName,
-//         selectedUserStatus,
-//       );
-//       await fetchSavingsOverview();
-//     } catch (error) {
-//       console.error("Error recording transaction:", error);
-//       toast.error(
-//         error.response?.data?.message || "Failed to record transaction",
-//       );
-//     } finally {
-//       setSubmitLoading(false);
-//     }
-//   };
-
-//   const openDeleteModal = (record) => {
-//     setDeleteModal({ record });
-//     setDeleteReason("");
-//   };
-
-//   const closeDeleteModal = () => {
-//     if (deleting) return;
-//     setDeleteModal(null);
-//     setDeleteReason("");
-//   };
-
-//   const handleDeleteRecord = async () => {
-//     if (!deleteModal || deleting) return;
-//     const { record } = deleteModal;
-//     setDeleting(true);
-
-//     try {
-//       const endpoint = `/admin/savings/${selectedUserId}/transaction/${record.id}`;
-
-//       await api.delete(endpoint, {
-//         data: { adjustmentReason: deleteReason.trim() || "Manual correction" },
-//       });
-
-//       toast.info(
-//         "Transaction corrected through adjustment entry. Original record preserved in audit log.",
-//       );
-//       setDeleteModal(null);
-//       setDeleteReason("");
-
-//       await openUserDetail(
-//         selectedUserId,
-//         selectedUserName,
-//         selectedUserStatus,
-//       );
-//       await fetchSavingsOverview();
-//     } catch (error) {
-//       console.error("Error correcting transaction:", error);
-//       toast.error(
-//         error.response?.data?.message ||
-//           "Failed to process correction. All transactions are immutable after posting.",
-//       );
-//     } finally {
-//       setDeleting(false);
-//     }
-//   };
-
-//   const goBack = () => {
-//     setSelectedUserId(null);
-//     setUserSavingsDetail(null);
-//     setOverviewPage(1);
-//   };
-
-//   if (loading)
-//     return (
-//       <div className="flex justify-center items-center h-96 bg-white rounded-2xl border border-slate-200">
-//         <div className="relative w-16 h-16">
-//           <div className="absolute inset-0 rounded-full border-4 border-slate-100"></div>
-//           <div className="absolute inset-0 rounded-full border-4 border-t-emerald-600 border-r-transparent animate-spin"></div>
-//         </div>
-//       </div>
-//     );
-
-//   // Ensure users is always an array
-//   const safeUsers = Array.isArray(users) ? users : [];
-
-//   const allMembers = safeUsers.map((u) => {
-//     const memberId = u.id || u.memberId;
-//     const fullName = u.fullName || u.name || "Unnamed Member";
-//     const status = u.status || "ACTIVE";
-
-//     const savRow = savingsOverview.find(
-//       (s) =>
-//         String(s.memberId) === String(memberId) ||
-//         String(s.id) === String(memberId) ||
-//         String(s.userId) === String(u.userId),
-//     );
-
-//     return (
-//       savRow || {
-//         id: memberId,
-//         memberId,
-//         userId: u.userId,
-//         fullName,
-//         email: u.email,
-//         status,
-//         totalSavings: u.memberBalance?.savingBalance || 0,
-//         lastTransaction: null,
-//         overdueMonths: u.overdueMonths || 0,
-//       }
-//     );
-//   });
-
-//   // Filter for overdue contributions if needed
-//   const filteredMembers = showOverdueOnly
-//     ? allMembers.filter((m) => m.overdueMonths > 0)
-//     : allMembers;
-
-//   const paginatedMembers = filteredMembers.slice(
-//     (overviewPage - 1) * ITEMS_PER_PAGE,
-//     overviewPage * ITEMS_PER_PAGE,
-//   );
-
-//   const activeRecords = userSavingsDetail?.savings || [];
-
-//   const paginatedRecords = activeRecords.slice(
-//     (historyPage - 1) * ITEMS_PER_PAGE,
-//     historyPage * ITEMS_PER_PAGE,
-//   );
-
-//   const getCategoryBadgeColor = (category) => {
-//     const colors = {
-//       INITIAL_SAVING: "bg-purple-100 text-purple-700",
-//       MONTHLY_SAVING: "bg-blue-100 text-blue-700",
-//       IRREGULAR_SAVING: "bg-orange-100 text-orange-700",
-//       CHILDREN_SAVING: "bg-pink-100 text-pink-700",
-//       ORGANIZATION_SAVING: "bg-teal-100 text-teal-700",
-//       WITHDRAWAL: "bg-red-100 text-red-700",
-//       ADJUSTMENT: "bg-yellow-100 text-yellow-700",
-//     };
-//     return colors[category] || "bg-slate-100 text-slate-700";
-//   };
-
-//   const getTransactionTypeBadgeColor = (type) => {
-//     switch (type) {
-//       case "DEPOSIT":
-//         return "bg-green-100 text-green-700";
-//       case "WITHDRAWAL":
-//         return "bg-red-100 text-red-700";
-//       case "ADJUSTMENT":
-//         return "bg-yellow-100 text-yellow-700";
-//       default:
-//         return "bg-slate-100 text-slate-700";
-//     }
-//   };
-
-//   const getMemberStatusBadge = (status) => {
-//     const colors = {
-//       ACTIVE: "bg-green-100 text-green-700 border-green-300",
-//       INACTIVE: "bg-red-100 text-red-700 border-red-300",
-//       SUSPENDED: "bg-yellow-100 text-yellow-700 border-yellow-300",
-//     };
-//     return colors[status] || "bg-slate-100 text-slate-700 border-slate-300";
-//   };
-
-//   return (
-//     <div className="space-y-8 p-6 bg-white min-h-screen text-slate-800 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in duration-500">
-//       {/* Header Panel */}
-//       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-6 gap-4">
-//         <div>
-//           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-//             Cooperative Savings Management
-//           </h2>
-//           <p className="text-slate-500 text-sm mt-1">
-//             {selectedUserId
-//               ? `Financial timeline for ${selectedUserName}`
-//               : "Manage member savings, contributions, and withdraw history with automatic balance calculation."}
-//           </p>
-//         </div>
-//         {selectedUserId && (
-//           <button
-//             className="bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 py-2 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center space-x-2 shadow-sm self-start sm:self-auto group"
-//             onClick={goBack}
-//           >
-//             <svg
-//               className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform"
-//               fill="none"
-//               stroke="currentColor"
-//               strokeWidth="2"
-//               viewBox="0 0 24 24"
-//             >
-//               <path
-//                 strokeLinecap="round"
-//                 strokeLinejoin="round"
-//                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
-//               />
-//             </svg>
-//             <span>Back to Directory</span>
-//           </button>
-//         )}
-//       </div>
-
-//       {!selectedUserId ? (
-//         <>
-//           {allMembers.length === 0 ? (
-//             <div className="bg-slate-50 border border-slate-200 p-8 rounded-2xl text-center">
-//               <p className="text-slate-500 text-sm">
-//                 No members found. Add members via Registration first.
-//               </p>
-//             </div>
-//           ) : (
-//             <div className="space-y-4">
-//               {/* Filter Controls */}
-//               <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-//                 <button
-//                   onClick={() => setShowOverdueOnly(!showOverdueOnly)}
-//                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-//                     showOverdueOnly
-//                       ? "bg-red-600 text-white shadow-md"
-//                       : "bg-white border border-slate-300 text-slate-700 hover:border-slate-400"
-//                   }`}
-//                 >
-//                   {showOverdueOnly ? "✓ Show Overdue" : "Show Overdue/Missed"}
-//                 </button>
-//                 <span className="text-xs text-slate-600 font-medium">
-//                   Showing {filteredMembers.length} of {allMembers.length}{" "}
-//                   members
-//                 </span>
-//               </div>
-
-//               {/* Members Table */}
-//               <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-//                 <div className="overflow-x-auto">
-//                   <table className="w-full text-left border-collapse">
-//                     <thead>
-//                       <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider border-b border-slate-200">
-//                         <th className="px-6 py-4">Member</th>
-//                         <th className="px-6 py-4">Status</th>
-//                         <th className="px-6 py-4">Total Savings</th>
-//                         <th className="px-6 py-4">Overdue Months</th>
-//                         <th className="px-6 py-4 text-right">Action</th>
-//                       </tr>
-//                     </thead>
-//                     <tbody className="divide-y divide-slate-100">
-//                       {paginatedMembers.map((member) => (
-//                         <tr
-//                           key={member.memberId || member.id}
-//                           className="hover:bg-slate-50/60 transition-colors duration-200 group"
-//                         >
-//                           <td className="px-6 py-4">
-//                             <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-//                               {member.fullName}
-//                             </div>
-//                             <div className="text-xs text-slate-500 font-mono mt-0.5">
-//                               {member.email}
-//                             </div>
-//                           </td>
-//                           <td className="px-6 py-4">
-//                             <span
-//                               className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${getMemberStatusBadge(
-//                                 member.status,
-//                               )}`}
-//                             >
-//                               {member.status}
-//                             </span>
-//                           </td>
-//                           <td className="px-6 py-4 font-bold text-emerald-600 font-mono">
-//                             ETB {(member.totalSavings || 0).toFixed(2)}
-//                           </td>
-//                           <td className="px-6 py-4">
-//                             {member.overdueMonths > 0 ? (
-//                               <span className="inline-block px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">
-//                                 {member.overdueMonths} month(s)
-//                               </span>
-//                             ) : (
-//                               <span className="text-xs text-slate-500">
-//                                 Current
-//                               </span>
-//                             )}
-//                           </td>
-//                           <td className="px-6 py-4 text-right">
-//                             <button
-//                               className={`border rounded-xl text-xs font-semibold shadow-sm transition-all duration-300 py-1.5 px-4 ${
-//                                 member.status === "ACTIVE"
-//                                   ? "bg-white border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-700"
-//                                   : "bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed"
-//                               }`}
-//                               onClick={() =>
-//                                 member.status === "ACTIVE" &&
-//                                 openUserDetail(
-//                                   member.memberId || member.id,
-//                                   member.fullName,
-//                                   member.status,
-//                                 )
-//                               }
-//                               disabled={member.status !== "ACTIVE"}
-//                             >
-//                               {member.status === "ACTIVE"
-//                                 ? "Manage Account"
-//                                 : "Inactive"}
-//                             </button>
-//                           </td>
-//                         </tr>
-//                       ))}
-//                     </tbody>
-//                   </table>
-//                 </div>
-//                 <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-//                   <Pagination
-//                     currentPage={overviewPage}
-//                     totalItems={filteredMembers.length}
-//                     itemsPerPage={ITEMS_PER_PAGE}
-//                     onPageChange={setOverviewPage}
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-//           )}
-//         </>
-//       ) : (
-//         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-//           <div className="lg:col-span-2 space-y-6">
-//             {detailLoading ? (
-//               <div className="flex justify-center items-center h-48 bg-white border border-slate-200 rounded-2xl">
-//                 <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin"></div>
-//               </div>
-//             ) : userSavingsDetail ? (
-//               <>
-//                 {/* Metric Profile Cards */}
-//                 <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 p-6 rounded-2xl shadow-sm">
-//                   <div className="flex justify-between items-start">
-//                     <div>
-//                       <div className="text-emerald-800 text-xs font-bold uppercase tracking-wider mb-2">
-//                         Current Saving Balance
-//                       </div>
-//                       <div className="text-4xl font-extrabold text-emerald-900 font-mono">
-//                         ETB {(userSavingsDetail.totalSavings || 0).toFixed(2)}
-//                       </div>
-//                       <p className="text-xs text-emerald-700 mt-2">
-//                         Automatically updated after each transaction
-//                       </p>
-//                     </div>
-//                     <div className="text-emerald-200">
-//                       <svg
-//                         className="w-16 h-16"
-//                         fill="currentColor"
-//                         viewBox="0 0 24 24"
-//                       >
-//                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-//                       </svg>
-//                     </div>
-//                   </div>
-//                 </div>
-
-//                 {/* Savings Ledger Block */}
-//                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-//                   <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200">
-//                     <h3 className="text-sm font-bold text-emerald-900 uppercase tracking-wider">
-//                       Complete Saving Transaction History
-//                     </h3>
-//                     <p className="text-xs text-emerald-700 mt-1">
-//                       All transactions are recorded in the audit log and cannot
-//                       be deleted. Corrections are made through adjustment
-//                       entries.
-//                     </p>
-//                   </div>
-
-//                   {activeRecords.length === 0 ? (
-//                     <p className="p-6 text-sm text-slate-400 italic text-center">
-//                       No transactions recorded yet. Start with the initial
-//                       saving transaction.
-//                     </p>
-//                   ) : (
-//                     <>
-//                       <div className="overflow-x-auto">
-//                         <table className="w-full text-left border-collapse">
-//                           <thead>
-//                             <tr className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
-//                               <th className="px-6 py-3">Date</th>
-//                               <th className="px-6 py-3">Category</th>
-//                               <th className="px-6 py-3">Type</th>
-//                               <th className="px-6 py-3">Method</th>
-//                               <th className="px-6 py-3">Reference</th>
-//                               <th className="px-6 py-3 text-right">Amount</th>
-//                               <th className="px-6 py-3 text-center">Action</th>
-//                             </tr>
-//                           </thead>
-//                           <tbody className="divide-y divide-slate-100 text-sm">
-//                             {paginatedRecords.map((record) => (
-//                               <tr
-//                                 key={record.id}
-//                                 className="hover:bg-slate-50/50 transition-colors"
-//                               >
-//                                 <td className="px-6 py-3 text-slate-700 font-medium whitespace-nowrap">
-//                                   {moment(record.transactionDate).format(
-//                                     "MMM DD, YYYY",
-//                                   )}
-//                                 </td>
-//                                 <td className="px-6 py-3">
-//                                   <span
-//                                     className={`inline-block px-2 py-1 rounded text-xs font-bold ${getCategoryBadgeColor(
-//                                       record.category,
-//                                     )}`}
-//                                   >
-//                                     {record.category.replace(/_/g, " ")}
-//                                   </span>
-//                                 </td>
-//                                 <td className="px-6 py-3">
-//                                   <span
-//                                     className={`inline-block px-2 py-1 rounded text-xs font-bold ${getTransactionTypeBadgeColor(
-//                                       record.type,
-//                                     )}`}
-//                                   >
-//                                     {record.type}
-//                                   </span>
-//                                 </td>
-//                                 <td className="px-6 py-3 text-slate-500 text-xs">
-//                                   {record.paymentMethod}
-//                                 </td>
-//                                 <td className="px-6 py-3 text-slate-500 text-xs font-mono">
-//                                   {record.referenceNo || "—"}
-//                                 </td>
-//                                 <td className="px-6 py-3 text-right font-bold font-mono text-slate-900">
-//                                   {record.type === "WITHDRAWAL" ? "−" : "+"}
-//                                   <span
-//                                     className={
-//                                       record.type === "WITHDRAWAL"
-//                                         ? "text-red-600"
-//                                         : "text-emerald-600"
-//                                     }
-//                                   >
-//                                     {Math.abs(
-//                                       parseFloat(record.amount),
-//                                     ).toFixed(2)}
-//                                   </span>
-//                                 </td>
-//                                 <td className="px-6 py-3 text-center">
-//                                   <button
-//                                     onClick={() => openDeleteModal(record)}
-//                                     className="text-amber-600 hover:text-amber-800 text-xs font-semibold px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 transition-colors"
-//                                     title="Create adjustment entry to correct this transaction"
-//                                   >
-//                                     Correct
-//                                   </button>
-//                                 </td>
-//                               </tr>
-//                             ))}
-//                           </tbody>
-//                         </table>
-//                       </div>
-//                       <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-//                         <Pagination
-//                           currentPage={historyPage}
-//                           totalItems={activeRecords.length}
-//                           itemsPerPage={ITEMS_PER_PAGE}
-//                           onPageChange={setHistoryPage}
-//                         />
-//                       </div>
-//                     </>
-//                   )}
-//                 </div>
-//               </>
-//             ) : (
-//               <div className="bg-red-50 border border-red-200 p-4 rounded-xl text-red-600 text-sm">
-//                 Could not load member financial details.
-//               </div>
-//             )}
-//           </div>
-
-//           {/* Transaction Entry Form */}
-//           <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-6 rounded-2xl shadow-sm sticky top-6">
-//             <h3 className="text-xs font-bold text-slate-700 tracking-wider uppercase mb-6 pb-3 border-b border-slate-300">
-//               📝 Record Saving Transaction
-//             </h3>
-
-//             {selectedUserStatus !== "ACTIVE" && (
-//               <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-xs">
-//                 ⚠️ Only active members can make saving transactions.
-//               </div>
-//             )}
-
-//             <form
-//               onSubmit={handleSubmit(onSubmitPayment)}
-//               className="space-y-4"
-//             >
-//               {/* Category Selection */}
-//               <div className="space-y-1.5">
-//                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                   Saving Category *
-//                 </label>
-//                 <select
-//                   {...register("category", { required: true })}
-//                   disabled={selectedUserStatus !== "ACTIVE"}
-//                   className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                 >
-//                   {savingCategoryOptions.map((option) => (
-//                     <option key={option.value} value={option.value}>
-//                       {option.label}
-//                     </option>
-//                   ))}
-//                 </select>
-//                 {errors.category && (
-//                   <p className="text-xs text-red-500">Category is required</p>
-//                 )}
-//               </div>
-
-//               {/* Amount Input */}
-//               <div className="space-y-1.5">
-//                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                   Amount (ETB) *
-//                 </label>
-//                 <div className="relative">
-//                   <span className="absolute left-4 top-3 text-slate-500 font-semibold">
-//                     ₦
-//                   </span>
-//                   <input
-//                     type="number"
-//                     step="0.01"
-//                     min="0"
-//                     {...register("amount", {
-//                       required: "Amount is required",
-//                       min: {
-//                         value: 0,
-//                         message: "Amount must be positive",
-//                       },
-//                     })}
-//                     disabled={selectedUserStatus !== "ACTIVE"}
-//                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 pl-8 text-sm font-mono outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                     placeholder="0.00"
-//                   />
-//                 </div>
-//                 {category === "MONTHLY_SAVING" && minimumSavingAmount > 0 && (
-//                   <p className="text-xs text-slate-500">
-//                     Minimum: ETB {minimumSavingAmount.toFixed(2)}
-//                   </p>
-//                 )}
-//                 {errors.amount && (
-//                   <p className="text-xs text-red-500">
-//                     {errors.amount.message}
-//                   </p>
-//                 )}
-//               </div>
-
-//               {/* Payment Method */}
-//               <div className="space-y-1.5">
-//                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                   Payment Method *
-//                 </label>
-//                 <select
-//                   {...register("paymentMethod", { required: true })}
-//                   disabled={selectedUserStatus !== "ACTIVE"}
-//                   className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                 >
-//                   {paymentMethodOptions.map((option) => (
-//                     <option key={option.value} value={option.value}>
-//                       {option.label}
-//                     </option>
-//                   ))}
-//                 </select>
-//               </div>
-
-//               {/* Payroll Month (Conditional) */}
-//               {paymentMethod === "PAYROLL" && (
-//                 <div className="space-y-1.5">
-//                   <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                     Payroll Month *
-//                   </label>
-//                   <input
-//                     type="month"
-//                     {...register("payrollMonth", {
-//                       required:
-//                         paymentMethod === "PAYROLL"
-//                           ? "Payroll month is required"
-//                           : false,
-//                     })}
-//                     disabled={selectedUserStatus !== "ACTIVE"}
-//                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                   />
-//                   {errors.payrollMonth && (
-//                     <p className="text-xs text-red-500">
-//                       {errors.payrollMonth.message}
-//                     </p>
-//                   )}
-//                 </div>
-//               )}
-
-//               {/* Date */}
-//               <div className="space-y-1.5">
-//                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                   Transaction Date *
-//                 </label>
-//                 <input
-//                   type="date"
-//                   {...register("transactionDate", { required: true })}
-//                   disabled={selectedUserStatus !== "ACTIVE"}
-//                   className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                 />
-//               </div>
-
-//               {/* Reference & Remarks */}
-//               <div className="space-y-1.5">
-//                 <label className="text-slate-600 text-[10px] font-semibold uppercase tracking-wider">
-//                   Reference & Notes (Optional)
-//                 </label>
-//                 <input
-//                   type="text"
-//                   {...register("referenceNo")}
-//                   disabled={selectedUserStatus !== "ACTIVE"}
-//                   placeholder="Ref #"
-//                   className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 mb-2 text-xs outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500"
-//                 />
-//                 <textarea
-//                   {...register("remarks")}
-//                   disabled={selectedUserStatus !== "ACTIVE"}
-//                   placeholder="Additional notes..."
-//                   rows="2"
-//                   className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs outline-none disabled:opacity-50 disabled:cursor-not-allowed focus:ring-1 focus:ring-emerald-500 resize-none"
-//                 />
-//               </div>
-
-//               {/* Submit Button */}
-//               <button
-//                 type="submit"
-//                 disabled={submitLoading || selectedUserStatus !== "ACTIVE"}
-//                 className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-6"
-//               >
-//                 {submitLoading
-//                   ? "Processing..."
-//                   : "✓ Record Saving Transaction"}
-//               </button>
-
-//               <p className="text-[10px] text-slate-500 italic mt-4 pt-4 border-t border-slate-300">
-//                 All transactions are automatically recorded in the audit log for
-//                 accountability and financial transparency.
-//               </p>
-//             </form>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* Correction Modal */}
-//       {deleteModal && (
-//         <div
-//           className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
-//           onClick={(e) => {
-//             if (e.target === e.currentTarget) closeDeleteModal();
-//           }}
-//         >
-//           <div className="bg-white p-6 rounded-2xl max-w-md w-full shadow-xl space-y-4">
-//             <div className="flex items-center space-x-3">
-//               <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-//                 <svg
-//                   className="w-6 h-6 text-amber-600"
-//                   fill="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-//                 </svg>
-//               </div>
-//               <div>
-//                 <h3 className="text-lg font-bold text-slate-900">
-//                   Create Adjustment Entry
-//                 </h3>
-//                 <p className="text-xs text-slate-500">
-//                   Original transaction preserved in audit
-//                 </p>
-//               </div>
-//             </div>
-
-//             <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-//               <p className="text-sm text-blue-900">
-//                 <strong>Original Transaction:</strong>
-//                 <br />
-//                 {deleteModal.record.category} - ETB{" "}
-//                 {parseFloat(deleteModal.record.amount).toFixed(2)}
-//               </p>
-//             </div>
-
-//             <div className="space-y-2">
-//               <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
-//                 Correction Reason *
-//               </label>
-//               <textarea
-//                 placeholder="Explain why this transaction needs to be corrected..."
-//                 value={deleteReason}
-//                 onChange={(e) => setDeleteReason(e.target.value)}
-//                 disabled={deleting}
-//                 rows="3"
-//                 className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-sm outline-none disabled:opacity-50 resize-none focus:ring-1 focus:ring-amber-500"
-//               />
-//               {!deleteReason && (
-//                 <p className="text-xs text-red-500">
-//                   Please provide a reason for the correction
-//                 </p>
-//               )}
-//             </div>
-
-//             <div className="flex justify-end gap-3">
-//               <button
-//                 type="button"
-//                 className="px-4 py-2 text-slate-600 text-sm font-semibold border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
-//                 onClick={closeDeleteModal}
-//                 disabled={deleting}
-//               >
-//                 Cancel
-//               </button>
-//               <button
-//                 type="button"
-//                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-400 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50"
-//                 onClick={handleDeleteRecord}
-//                 disabled={deleting || !deleteReason.trim()}
-//               >
-//                 {deleting ? "Processing..." : "Create Adjustment"}
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
-
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "../../services/api";
 import { toast } from "react-toastify";
@@ -973,7 +33,30 @@ const ManageSavings = () => {
   const [minimumSavingAmount, setMinimumSavingAmount] = useState(0);
   const [interestRate, setInterestRate] = useState(0);
   const [interestCalculationMethod, setInterestCalculationMethod] =
-    useState("COMPOUND_MONTHLY"); // SIMPLE, COMPOUND_MONTHLY, COMPOUND_QUARTERLY, COMPOUND_ANNUALLY
+    useState("COMPOUND_MONTHLY");
+
+  // ============== Bulk Operations State ==============
+  const [showBulkOperations, setShowBulkOperations] = useState(false);
+  const [bulkOperationType, setBulkOperationType] = useState("MONTHLY_SAVINGS"); // MONTHLY_SAVINGS, INTEREST_CALCULATION, RECONCILIATION
+  const [bulkSelectedMembers, setBulkSelectedMembers] = useState([]);
+  const [bulkBatchAmount, setBulkBatchAmount] = useState("");
+  const [bulkBatchDate, setBulkBatchDate] = useState(
+    moment().format("YYYY-MM-DD"),
+  );
+  const [bulkBatchMethod, setBulkBatchMethod] = useState("CASH");
+  const [bulkBatchRemarks, setBulkBatchRemarks] = useState("");
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkAllSelected, setBulkAllSelected] = useState(false);
+
+  // ============== Monthly Reconciliation State ==============
+  const [reconciliationMonth, setReconciliationMonth] = useState(
+    moment().format("YYYY-MM"),
+  );
+  const [reconciliationData, setReconciliationData] = useState(null);
+  const [showReconciliation, setShowReconciliation] = useState(false);
+  const [reconciliationProcessing, setReconciliationProcessing] =
+    useState(false);
 
   // ============== Payment Method Options ==============
   const paymentMethodOptions = [
@@ -1061,16 +144,6 @@ const ManageSavings = () => {
 
   // ============== INTEREST CALCULATION FORMULAS ==============
 
-  /**
-   * Calculate Simple Interest
-   * Formula: A = P × (1 + R × T)
-   * Where:
-   * P = Principal amount
-   * R = Annual interest rate (as decimal)
-   * T = Time in years
-   * A = Final amount
-   * Interest = A - P
-   */
   const calculateSimpleInterest = useCallback((principal, rate, months) => {
     if (rate <= 0) return 0;
     const timeInYears = months / 12;
@@ -1079,17 +152,6 @@ const ManageSavings = () => {
     return interest;
   }, []);
 
-  /**
-   * Calculate Compound Interest (Monthly Compounding)
-   * Formula: A = P × (1 + R/n)^(n×T)
-   * Where:
-   * P = Principal amount
-   * R = Annual interest rate (as decimal)
-   * n = Number of times interest is compounded per year (12 for monthly)
-   * T = Time in years
-   * A = Final amount
-   * Interest = A - P
-   */
   const calculateCompoundMonthlyInterest = useCallback(
     (principal, rate, months) => {
       if (rate <= 0) return 0;
@@ -1108,11 +170,6 @@ const ManageSavings = () => {
     [],
   );
 
-  /**
-   * Calculate Compound Interest (Quarterly Compounding)
-   * Formula: A = P × (1 + R/n)^(n×T)
-   * Where n = 4 for quarterly compounding
-   */
   const calculateCompoundQuarterlyInterest = useCallback(
     (principal, rate, months) => {
       if (rate <= 0) return 0;
@@ -1131,11 +188,6 @@ const ManageSavings = () => {
     [],
   );
 
-  /**
-   * Calculate Compound Interest (Annual Compounding)
-   * Formula: A = P × (1 + R/n)^(n×T)
-   * Where n = 1 for annual compounding
-   */
   const calculateCompoundAnnuallyInterest = useCallback(
     (principal, rate, months) => {
       if (rate <= 0) return 0;
@@ -1154,10 +206,6 @@ const ManageSavings = () => {
     [],
   );
 
-  /**
-   * Main Interest Calculation Function
-   * Routes to appropriate formula based on calculation method
-   */
   const calculateAccumulatedInterest = useCallback(
     (savings, rate, method) => {
       if (!Array.isArray(savings) || !rate || rate === 0) return 0;
@@ -1167,7 +215,6 @@ const ManageSavings = () => {
         (a, b) => new Date(a.transactionDate) - new Date(b.transactionDate),
       );
 
-      // Build balance timeline
       let balance = 0;
       let lastDate = null;
 
@@ -1175,7 +222,6 @@ const ManageSavings = () => {
         const currentAmount = parseFloat(record.amount) || 0;
         const recordDate = new Date(record.transactionDate);
 
-        // Calculate interest on previous balance until this transaction
         if (lastDate && balance > 0) {
           const monthsDiff =
             (recordDate.getFullYear() - lastDate.getFullYear()) * 12 +
@@ -1225,7 +271,6 @@ const ManageSavings = () => {
           }
         }
 
-        // Update balance based on transaction type
         if (record.type === "DEPOSIT") {
           balance += currentAmount;
         } else if (record.type === "WITHDRAWAL") {
@@ -1235,7 +280,6 @@ const ManageSavings = () => {
         lastDate = recordDate;
       });
 
-      // Calculate interest on final balance until today
       if (lastDate && balance > 0) {
         const today = new Date();
         const monthsDiff =
@@ -1333,9 +377,22 @@ const ManageSavings = () => {
   const fetchUsers = useCallback(async () => {
     try {
       const res = await api.get("/admin/users");
-      const membersList = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data || [];
+      // 2. Safely parse through common pagination structures
+      let membersList = [];
+
+      if (Array.isArray(res.data)) {
+        membersList = res.data;
+      } else if (Array.isArray(res.data?.members)) {
+        // 👈 Common Prisma pattern
+        membersList = res.data.members;
+      } else if (Array.isArray(res.data?.users)) {
+        membersList = res.data.users;
+      } else if (Array.isArray(res.data?.data)) {
+        membersList = res.data.data;
+      } else if (Array.isArray(res.data?.data?.members)) {
+        membersList = res.data.data.members;
+      }
+
       setUsers(membersList);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -1426,7 +483,7 @@ const ManageSavings = () => {
     }
   };
 
-  // ============== Transaction Submission ==============
+  // ============== Transaction Submission (Individual) ==============
   const onSubmitPayment = async (data) => {
     if (selectedUserStatus !== "ACTIVE") {
       toast.error("Only active members can make saving transactions.");
@@ -1493,6 +550,200 @@ const ManageSavings = () => {
     }
   };
 
+  // ============== Bulk Operations ==============
+
+  const getActiveMembers = useCallback(() => {
+    const safeUsers = Array.isArray(users) ? users : [];
+    return safeUsers.filter(
+      (u) => u.status === "ACTIVE" || u.status === undefined,
+    );
+  }, [users]);
+
+  const handleBulkMemberToggle = (userId) => {
+    setBulkSelectedMembers((prev) => {
+      if (prev.includes(userId)) {
+        return prev.filter((id) => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleBulkSelectAll = () => {
+    const activeMembers = getActiveMembers();
+    if (bulkAllSelected) {
+      setBulkSelectedMembers([]);
+      setBulkAllSelected(false);
+    } else {
+      setBulkSelectedMembers(activeMembers.map((m) => m.id || m.memberId));
+      setBulkAllSelected(true);
+    }
+  };
+
+  const generateBulkPreview = () => {
+    const activeMembers = getActiveMembers();
+    const selectedMembersData = activeMembers.filter((m) =>
+      bulkSelectedMembers.includes(m.id || m.memberId),
+    );
+
+    let totalAmount = 0;
+
+    if (bulkOperationType === "MONTHLY_SAVINGS") {
+      const amount = parseFloat(bulkBatchAmount) || 0;
+      totalAmount = amount * selectedMembersData.length;
+    } else if (bulkOperationType === "INTEREST_CALCULATION") {
+      selectedMembersData.forEach((member) => {
+        const memberSavings = savingsOverview.find(
+          (s) => String(s.memberId) === String(member.id || member.memberId),
+        );
+        if (memberSavings) {
+          const interest = calculateAccumulatedInterest(
+            memberSavings.savings || [],
+            interestRate,
+            interestCalculationMethod,
+          );
+          totalAmount += interest;
+        }
+      });
+    }
+
+    setBulkPreview({
+      memberCount: selectedMembersData.length,
+      members: selectedMembersData,
+      totalAmount,
+      operationType: bulkOperationType,
+      date: bulkBatchDate,
+      method: bulkBatchMethod,
+    });
+  };
+
+  const processBulkOperation = async () => {
+    if (bulkSelectedMembers.length === 0) {
+      toast.error("Please select at least one member");
+      return;
+    }
+
+    if (bulkOperationType === "MONTHLY_SAVINGS") {
+      if (!bulkBatchAmount || parseFloat(bulkBatchAmount) <= 0) {
+        toast.error("Please enter a valid amount");
+        return;
+      }
+
+      if (parseFloat(bulkBatchAmount) < minimumSavingAmount) {
+        toast.error(
+          `Amount cannot be less than minimum saving amount: ETB ${minimumSavingAmount}`,
+        );
+        return;
+      }
+    }
+
+    setBulkProcessing(true);
+
+    try {
+      const activeMembers = getActiveMembers();
+      const selectedMembers = activeMembers.filter((m) =>
+        bulkSelectedMembers.includes(m.id || m.memberId),
+      );
+
+      if (bulkOperationType === "MONTHLY_SAVINGS") {
+        const payload = {
+          memberIds: selectedMembers.map((m) => m.id || m.memberId),
+          category: "MONTHLY_SAVING",
+          type: "DEPOSIT",
+          amount: parseFloat(bulkBatchAmount),
+          transactionDate: bulkBatchDate,
+          paymentMethod: bulkBatchMethod,
+          remarks:
+            bulkBatchRemarks ||
+            `Bulk monthly saving batch - ${moment().format("YYYY-MM-DD HH:mm")}`,
+        };
+
+        await api.post("/admin/savings/bulk/monthly-savings", payload);
+        toast.success(
+          `Monthly savings posted for ${selectedMembers.length} members`,
+        );
+      } else if (bulkOperationType === "INTEREST_CALCULATION") {
+        const payload = {
+          memberIds: selectedMembers.map((m) => m.id || m.memberId),
+          interestRate,
+          interestCalculationMethod,
+          transactionDate: bulkBatchDate,
+        };
+
+        await api.post("/admin/savings/bulk/calculate-interest", payload);
+        toast.success(
+          `Interest calculated and posted for ${selectedMembers.length} members`,
+        );
+      }
+
+      // Reset bulk operations
+      setBulkSelectedMembers([]);
+      setBulkAllSelected(false);
+      setBulkBatchAmount("");
+      setBulkBatchRemarks("");
+      setBulkPreview(null);
+
+      // Refresh data
+      await fetchSavingsOverview();
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error processing bulk operation:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to process bulk operation",
+      );
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  // ============== Monthly Reconciliation ==============
+
+  const fetchReconciliationData = async () => {
+    try {
+      setReconciliationProcessing(true);
+      const response = await api.get("/admin/savings/reconciliation", {
+        params: {
+          month: reconciliationMonth,
+        },
+      });
+
+      setReconciliationData(response.data);
+      setShowReconciliation(true);
+    } catch (error) {
+      console.error("Error fetching reconciliation data:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch reconciliation data",
+      );
+    } finally {
+      setReconciliationProcessing(false);
+    }
+  };
+
+  const processReconciliation = async () => {
+    try {
+      setReconciliationProcessing(true);
+      const payload = {
+        month: reconciliationMonth,
+        reconciliationData,
+      };
+
+      await api.post("/admin/savings/reconciliation/process", payload);
+      toast.success("Monthly reconciliation completed successfully");
+
+      // Refresh data
+      await fetchSavingsOverview();
+      setShowReconciliation(false);
+      setReconciliationData(null);
+    } catch (error) {
+      console.error("Error processing reconciliation:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to process reconciliation",
+      );
+    } finally {
+      setReconciliationProcessing(false);
+    }
+  };
+
   // ============== Correction/Delete Handlers ==============
   const openDeleteModal = (record) => {
     setDeleteModal({ record });
@@ -1546,7 +797,7 @@ const ManageSavings = () => {
     setOverviewPage(1);
   };
 
-  // ============== Computed Data (All hooks BEFORE conditional returns) ==============
+  // ============== Computed Data ==============
   const safeUsers = Array.isArray(users) ? users : [];
 
   const allMembers = safeUsers.map((u) => {
@@ -1576,7 +827,6 @@ const ManageSavings = () => {
     );
   });
 
-  // ============== Filtering Logic ==============
   const filteredMembers = showOverdueOnly
     ? allMembers.filter((m) => m.overdueMonths > 0)
     : allMembers;
@@ -1593,7 +843,6 @@ const ManageSavings = () => {
     overviewPage * ITEMS_PER_PAGE,
   );
 
-  // ============== Transaction History Filtering ==============
   const activeRecords = userSavingsDetail?.savings || [];
 
   const filteredRecords = useMemo(() => {
@@ -1634,7 +883,6 @@ const ManageSavings = () => {
     historyPage * ITEMS_PER_PAGE,
   );
 
-  // ============== Category Savings Calculations ==============
   const categorySavings = useMemo(() => {
     return calculateCategorySavings(userSavingsDetail?.savings || []);
   }, [userSavingsDetail, calculateCategorySavings]);
@@ -1741,7 +989,6 @@ const ManageSavings = () => {
   };
 
   // ============== RENDER ==============
-  // Loading state (early return but after all hooks)
   if (loading)
     return (
       <div className="flex justify-center items-center h-96 bg-white rounded-2xl border border-slate-200">
@@ -1766,6 +1013,23 @@ const ManageSavings = () => {
               : "Manage member savings, contributions, withdrawals, and interest calculations with complete audit trail."}
           </p>
         </div>
+        {!selectedUserId && (
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setShowBulkOperations(!showBulkOperations)}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-xl text-sm font-medium transition-all shadow-md"
+            >
+              ⚙️ Bulk Operations
+            </button>
+            <button
+              onClick={fetchReconciliationData}
+              disabled={reconciliationProcessing}
+              className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white py-2 px-4 rounded-xl text-sm font-medium transition-all shadow-md"
+            >
+              📊 Monthly Reconciliation
+            </button>
+          </div>
+        )}
         {selectedUserId && (
           <button
             className="bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 py-2 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center space-x-2 shadow-sm self-start sm:self-auto group"
@@ -1789,6 +1053,336 @@ const ManageSavings = () => {
         )}
       </div>
 
+      {/* ============== Bulk Operations Panel ============== */}
+      {showBulkOperations && !selectedUserId && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-6 rounded-2xl shadow-md">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-blue-900">
+              ⚙️ Bulk Operations
+            </h3>
+            <button
+              onClick={() => setShowBulkOperations(false)}
+              className="text-blue-600 hover:text-blue-800 text-xl"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Operation Type Selection */}
+            <div className="space-y-4 lg:col-span-3">
+              <div className="flex gap-3">
+                {[
+                  {
+                    value: "MONTHLY_SAVINGS",
+                    label: "📅 Batch Monthly Savings",
+                  },
+                  {
+                    value: "INTEREST_CALCULATION",
+                    label: "💰 Bulk Interest Calculation",
+                  },
+                ].map((op) => (
+                  <button
+                    key={op.value}
+                    onClick={() => {
+                      setBulkOperationType(op.value);
+                      setBulkSelectedMembers([]);
+                      setBulkAllSelected(false);
+                      setBulkPreview(null);
+                    }}
+                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                      bulkOperationType === op.value
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-50"
+                    }`}
+                  >
+                    {op.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Member Selection */}
+            <div className="lg:col-span-3 space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold text-slate-700">
+                  Select Members ({bulkSelectedMembers.length} selected)
+                </label>
+                <button
+                  onClick={handleBulkSelectAll}
+                  className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
+                >
+                  {bulkAllSelected ? "Deselect All" : "Select All Active"}
+                </button>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto bg-white border border-blue-200 rounded-lg p-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {getActiveMembers().map((member) => (
+                    <label
+                      key={member.id || member.memberId}
+                      className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={bulkSelectedMembers.includes(
+                          member.id || member.memberId,
+                        )}
+                        onChange={() =>
+                          handleBulkMemberToggle(member.id || member.memberId)
+                        }
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">
+                        {member.fullName || member.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Operation Parameters */}
+            {bulkOperationType === "MONTHLY_SAVINGS" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    Amount (ETB)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={bulkBatchAmount}
+                    onChange={(e) => setBulkBatchAmount(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                    placeholder="Enter amount"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Minimum: ETB {minimumSavingAmount.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    Payment Method
+                  </label>
+                  <select
+                    value={bulkBatchMethod}
+                    onChange={(e) => setBulkBatchMethod(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    {paymentMethodOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    Transaction Date
+                  </label>
+                  <input
+                    type="date"
+                    value={bulkBatchDate}
+                    onChange={(e) => setBulkBatchDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </>
+            )}
+
+            {bulkOperationType === "INTEREST_CALCULATION" && (
+              <div className="space-y-2 lg:col-span-3">
+                <label className="text-sm font-bold text-slate-700">
+                  Interest Posting Date
+                </label>
+                <input
+                  type="date"
+                  value={bulkBatchDate}
+                  onChange={(e) => setBulkBatchDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                />
+                <p className="text-xs text-slate-600">
+                  Interest Rate: {interestRate}% ({interestCalculationMethod})
+                </p>
+              </div>
+            )}
+
+            {/* Remarks */}
+            <div className="lg:col-span-3 space-y-2">
+              <label className="text-sm font-bold text-slate-700">
+                Remarks (Optional)
+              </label>
+              <textarea
+                value={bulkBatchRemarks}
+                onChange={(e) => setBulkBatchRemarks(e.target.value)}
+                placeholder="Add notes for this bulk operation..."
+                rows="2"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+              />
+            </div>
+
+            {/* Preview & Action Buttons */}
+            <div className="lg:col-span-3 flex gap-3">
+              <button
+                onClick={generateBulkPreview}
+                disabled={
+                  bulkSelectedMembers.length === 0 ||
+                  (bulkOperationType === "MONTHLY_SAVINGS" && !bulkBatchAmount)
+                }
+                className="flex-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm transition-all"
+              >
+                👁️ Preview
+              </button>
+              <button
+                onClick={processBulkOperation}
+                disabled={bulkProcessing || !bulkPreview}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-lg font-semibold text-sm transition-all"
+              >
+                {bulkProcessing ? "Processing..." : "✓ Process"}
+              </button>
+            </div>
+          </div>
+
+          {/* Bulk Preview */}
+          {bulkPreview && (
+            <div className="mt-6 pt-6 border-t border-blue-200">
+              <h4 className="font-bold text-blue-900 mb-4">Preview Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-white p-3 rounded-lg border border-blue-200">
+                  <div className="text-xs text-slate-600">Members</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {bulkPreview.memberCount}
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-blue-200">
+                  <div className="text-xs text-slate-600">Total Amount</div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    ETB {bulkPreview.totalAmount.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-blue-200">
+                  <div className="text-xs text-slate-600">Operation</div>
+                  <div className="text-sm font-bold">
+                    {bulkPreview.operationType.replace(/_/g, " ")}
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-blue-200">
+                  <div className="text-xs text-slate-600">Date</div>
+                  <div className="text-sm font-bold">
+                    {moment(bulkPreview.date).format("MMM DD, YYYY")}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============== Reconciliation Panel ============== */}
+      {showReconciliation && reconciliationData && (
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 p-6 rounded-2xl shadow-md">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-purple-900">
+              📊 Monthly Reconciliation -{" "}
+              {moment(reconciliationMonth).format("MMMM YYYY")}
+            </h3>
+            <button
+              onClick={() => setShowReconciliation(false)}
+              className="text-purple-600 hover:text-purple-800 text-xl"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-lg border border-purple-200">
+              <div className="text-xs font-bold text-slate-600">
+                Total Members
+              </div>
+              <div className="text-3xl font-bold text-purple-600">
+                {reconciliationData.totalMembers || 0}
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-purple-200">
+              <div className="text-xs font-bold text-slate-600">
+                Total Savings
+              </div>
+              <div className="text-2xl font-bold text-emerald-600">
+                ETB {(reconciliationData.totalSavings || 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-purple-200">
+              <div className="text-xs font-bold text-slate-600">
+                Total Deposits
+              </div>
+              <div className="text-2xl font-bold text-blue-600">
+                ETB {(reconciliationData.totalDeposits || 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-purple-200">
+              <div className="text-xs font-bold text-slate-600">
+                Total Interest
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                ETB {(reconciliationData.totalInterest || 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-purple-200 rounded-lg p-4 mb-6 max-h-96 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2 px-2">Member</th>
+                  <th className="text-right py-2 px-2">Savings</th>
+                  <th className="text-right py-2 px-2">Interest</th>
+                  <th className="text-right py-2 px-2">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reconciliationData.memberDetails &&
+                  reconciliationData.memberDetails.map((member, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-slate-100 hover:bg-slate-50"
+                    >
+                      <td className="py-2 px-2 font-medium">
+                        {member.memberName}
+                      </td>
+                      <td className="text-right py-2 px-2">
+                        ETB {(member.savings || 0).toFixed(2)}
+                      </td>
+                      <td className="text-right py-2 px-2 text-green-600">
+                        ETB {(member.interest || 0).toFixed(2)}
+                      </td>
+                      <td className="text-right py-2 px-2 font-bold">
+                        ETB{" "}
+                        {(
+                          (member.savings || 0) + (member.interest || 0)
+                        ).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          <button
+            onClick={processReconciliation}
+            disabled={reconciliationProcessing}
+            className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white rounded-lg font-bold transition-all"
+          >
+            {reconciliationProcessing
+              ? "Processing..."
+              : "✓ Confirm & Process Reconciliation"}
+          </button>
+        </div>
+      )}
+
       {/* ============== Overview/Directory View ============== */}
       {!selectedUserId ? (
         <>
@@ -1802,7 +1396,6 @@ const ManageSavings = () => {
             <div className="space-y-4">
               {/* Filter & Search Controls */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Search */}
                 <div className="relative">
                   <svg
                     className="absolute left-3 top-3 w-5 h-5 text-slate-400"
@@ -1829,7 +1422,6 @@ const ManageSavings = () => {
                   />
                 </div>
 
-                {/* Overdue Filter */}
                 <button
                   onClick={() => {
                     setShowOverdueOnly(!showOverdueOnly);
@@ -1844,7 +1436,6 @@ const ManageSavings = () => {
                   {showOverdueOnly ? "✓ Show Overdue" : "Show Overdue/Missed"}
                 </button>
 
-                {/* Stats Display */}
                 <div className="col-span-1 md:col-span-2 lg:col-span-2 flex items-center justify-end gap-2">
                   <span className="text-xs text-slate-600 font-medium px-4 py-2 bg-slate-100 rounded-lg border border-slate-200">
                     📊 {searchFilteredMembers.length} of {allMembers.length}{" "}
@@ -1965,7 +1556,6 @@ const ManageSavings = () => {
               <>
                 {/* ============== Summary Cards Grid ============== */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Current Balance */}
                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 p-4 rounded-xl shadow-sm">
                     <div className="text-emerald-700 text-xs font-bold uppercase tracking-wider mb-1">
                       Current Balance
@@ -1978,7 +1568,6 @@ const ManageSavings = () => {
                     </p>
                   </div>
 
-                  {/* Total Deposits */}
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-4 rounded-xl shadow-sm">
                     <div className="text-blue-700 text-xs font-bold uppercase tracking-wider mb-1">
                       Total Deposits
@@ -1991,7 +1580,6 @@ const ManageSavings = () => {
                     </p>
                   </div>
 
-                  {/* Monthly Savings */}
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 p-4 rounded-xl shadow-sm">
                     <div className="text-purple-700 text-xs font-bold uppercase tracking-wider mb-1">
                       Monthly Savings
@@ -2004,7 +1592,6 @@ const ManageSavings = () => {
                     </p>
                   </div>
 
-                  {/* Initial Savings */}
                   <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 p-4 rounded-xl shadow-sm">
                     <div className="text-indigo-700 text-xs font-bold uppercase tracking-wider mb-1">
                       Initial Savings
@@ -2017,7 +1604,6 @@ const ManageSavings = () => {
                     </p>
                   </div>
 
-                  {/* Irregular Savings */}
                   <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 p-4 rounded-xl shadow-sm">
                     <div className="text-orange-700 text-xs font-bold uppercase tracking-wider mb-1">
                       Irregular Savings
@@ -2030,7 +1616,6 @@ const ManageSavings = () => {
                     </p>
                   </div>
 
-                  {/* Accumulated Interest */}
                   {interestRate > 0 && (
                     <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 p-4 rounded-xl shadow-sm">
                       <div className="text-green-700 text-xs font-bold uppercase tracking-wider mb-1">
@@ -2048,7 +1633,6 @@ const ManageSavings = () => {
                     </div>
                   )}
 
-                  {/* Total With Interest */}
                   {interestRate > 0 && (
                     <div className="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 p-4 rounded-xl shadow-sm col-span-2 lg:col-span-1">
                       <div className="text-rose-700 text-xs font-bold uppercase tracking-wider mb-1">
@@ -2064,7 +1648,6 @@ const ManageSavings = () => {
                   )}
                 </div>
 
-                {/* ============== Interest Calculation Info Banner ============== */}
                 {interestRate > 0 && (
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-xl">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -2127,94 +1710,6 @@ const ManageSavings = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* Filters */}
-                  {activeRecords.length > 0 && (
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-xs font-semibold text-slate-600 block mb-1">
-                            Category
-                          </label>
-                          <select
-                            value={filterCategory}
-                            onChange={(e) => {
-                              setFilterCategory(e.target.value);
-                              setHistoryPage(1);
-                            }}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
-                          >
-                            <option value="ALL">All Categories</option>
-                            {savingCategoryOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-slate-600 block mb-1">
-                            Payment Method
-                          </label>
-                          <select
-                            value={filterPaymentMethod}
-                            onChange={(e) => {
-                              setFilterPaymentMethod(e.target.value);
-                              setHistoryPage(1);
-                            }}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
-                          >
-                            <option value="ALL">All Methods</option>
-                            {paymentMethodOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-slate-600 block mb-1">
-                            Date Range
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="date"
-                              value={filterDateRange.startDate || ""}
-                              onChange={(e) => {
-                                setFilterDateRange({
-                                  ...filterDateRange,
-                                  startDate: e.target.value,
-                                });
-                                setHistoryPage(1);
-                              }}
-                              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
-                              placeholder="From"
-                            />
-                            <input
-                              type="date"
-                              value={filterDateRange.endDate || ""}
-                              onChange={(e) => {
-                                setFilterDateRange({
-                                  ...filterDateRange,
-                                  endDate: e.target.value,
-                                });
-                                setHistoryPage(1);
-                              }}
-                              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
-                              placeholder="To"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-slate-600 font-medium">
-                        Showing {filteredRecords.length} of{" "}
-                        {activeRecords.length} transactions
-                      </div>
-                    </div>
-                  )}
 
                   {activeRecords.length === 0 ? (
                     <p className="p-6 text-sm text-slate-400 italic text-center">
@@ -2355,7 +1850,6 @@ const ManageSavings = () => {
               onSubmit={handleSubmit(onSubmitPayment)}
               className="space-y-4"
             >
-              {/* Category Selection */}
               <div className="space-y-1.5">
                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   Saving Category *
@@ -2376,7 +1870,6 @@ const ManageSavings = () => {
                 )}
               </div>
 
-              {/* Amount Input */}
               <div className="space-y-1.5">
                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   Amount (ETB) *
@@ -2413,7 +1906,6 @@ const ManageSavings = () => {
                 )}
               </div>
 
-              {/* Payment Method */}
               <div className="space-y-1.5">
                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   Payment Method *
@@ -2431,7 +1923,6 @@ const ManageSavings = () => {
                 </select>
               </div>
 
-              {/* Payroll Month (Conditional) */}
               {paymentMethod === "PAYROLL" && (
                 <div className="space-y-1.5">
                   <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
@@ -2456,7 +1947,6 @@ const ManageSavings = () => {
                 </div>
               )}
 
-              {/* Date */}
               <div className="space-y-1.5">
                 <label className="text-slate-600 text-xs font-semibold uppercase tracking-wider">
                   Transaction Date *
@@ -2469,7 +1959,6 @@ const ManageSavings = () => {
                 />
               </div>
 
-              {/* Reference & Remarks */}
               <div className="space-y-1.5">
                 <label className="text-slate-600 text-[10px] font-semibold uppercase tracking-wider">
                   Reference & Notes (Optional)
@@ -2490,7 +1979,6 @@ const ManageSavings = () => {
                 />
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={submitLoading || selectedUserStatus !== "ACTIVE"}

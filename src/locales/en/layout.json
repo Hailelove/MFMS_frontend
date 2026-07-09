@@ -1,0 +1,18 @@
+{
+  "nav": {
+    "Dashboard": "Dashboard",
+    "Campus Register": "Campus Register",
+    "Register Member": "Register Member",
+    "Manage Member": "Manage Member",
+    "Manage Savings": "Manage Savings",
+    "Manage Loans": "Manage Loans",
+    "Payroll Check": "Payroll Check",
+    "Ledger": "Ledger",
+    "Reports": "Reports",
+    "System Config": "System Config",
+
+    "My Loans": "My Loans",
+    "My Savings": "My Savings",
+    "Attendance": "Attendance"
+  }
+}

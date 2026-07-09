@@ -1,0 +1,13 @@
+{
+  "appName": "Saving and Loan Management System",
+  "dashboard": "Dashboard",
+  "login": "Login",
+  "Logout": "Logout",
+  "save": "Save",
+  "cancel": "Cancel",
+  "Settings": "Settings",
+  "Profile": "Profile",
+  "language": "Language",
+  "english": "English",
+  "amharic": "Amharic"
+}

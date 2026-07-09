@@ -1,0 +1,8 @@
+{
+  "loan": "Loan",
+  "loanAmount": "Loan Amount",
+  "interest": "Interest Rate",
+  "approve": "Approve",
+  "reject": "Reject",
+  "repayment": "Loan Repayment"
+}

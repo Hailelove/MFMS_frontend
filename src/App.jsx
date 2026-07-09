@@ -42,6 +42,7 @@ import CampusRegistration from "./pages/Admin/CampusRegistration";
 import PayrollManager from "./pages/Admin/PayrollManager";
 import LedgerView from "./pages/Admin/LedgerView";
 import SystemConfig from "./pages/Admin/SystemConfig";
+import Settings from "./pages/Settings";
 
 const App = () => {
   return (
@@ -60,9 +61,11 @@ const App = () => {
               GuestRoute prevents logged-in users from seeing login/register.
               If already authenticated, they are redirected to their dashboard.
           ─────────────────────────────────────────────────────────────────── */}
+
           <Route element={<GuestRoute />}>
             {/* <Route element={<PublicLayout />}> */}
             <Route path="/login" element={<Login />} />
+
             {/* </Route> */}
           </Route>
 
@@ -76,6 +79,7 @@ const App = () => {
               <Route path="/my-loans" element={<MyLoans />} />
               <Route path="/my-savings" element={<MySavings />} />
               <Route path="/my-attendance" element={<MyAttendance />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
           </Route>
 

@@ -323,7 +323,7 @@ const ManageMember = () => {
                         onClick={() => openEdit(member)}
                         className="text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        Edit Profile
+                        Edit Member
                       </button>
                       <button
                         onClick={() => handleDelete(member.id)}
